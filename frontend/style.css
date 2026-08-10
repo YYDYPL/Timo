@@ -337,6 +337,7 @@ input::placeholder, textarea::placeholder { color: #9aa39f; }
 .empty-state.large { min-height: 380px; align-content: center; }
 .empty-state h2, .empty-state h3 { margin: 12px 0 7px; }
 .empty-state p { max-width: 440px; margin-bottom: 20px; color: var(--muted); }
+.empty-actions { display: flex; gap: 9px; }
 .empty-mark { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-size: 24px; font-weight: 800; }
 .empty-mark.error { background: var(--danger-soft); color: var(--danger); }
 
@@ -359,6 +360,9 @@ input::placeholder, textarea::placeholder { color: #9aa39f; }
 .modal-header h2 { margin-bottom: 0; font-size: 24px; }
 .field { display: grid; gap: 6px; margin-bottom: 17px; }
 .field > span { color: var(--text-soft); font-size: 13px; font-weight: 700; }
+.field.checkbox-field { display: flex; align-items: center; gap: 9px; margin-bottom: 20px; }
+.field.checkbox-field input { width: 16px; height: 16px; accent-color: var(--brand); }
+.field.checkbox-field > span { font-weight: 500; }
 .form-grid { display: grid; gap: 15px; }
 .form-grid.two-columns { grid-template-columns: 1fr 1fr; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
@@ -437,6 +441,7 @@ input::placeholder, textarea::placeholder { color: #9aa39f; }
 .followup-item + .followup-item { border-top: 1px solid var(--line); }
 .followup-check { padding-top: 3px; }
 .followup-item h3 { margin-bottom: 8px; font-size: 15px; line-height: 1.5; }
+.followup-answer { margin: 0 0 10px; font-size: 13px; line-height: 1.6; color: var(--text); }
 .followup-keypoints { display: flex; flex-wrap: wrap; gap: 5px; }
 .followup-keypoints span { padding: 2px 7px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-dark); font-size: 11px; }
 

@@ -59,6 +59,10 @@
       <div id="followup-content" hidden>
         <div class="selection-toolbar"><label class="check-label"><input id="select-all-followups" type="checkbox" checked><span>全选</span></label><span id="followup-count" class="muted-label"></span></div>
         <div id="followup-list" class="followup-list"></div>
+        <label class="field checkbox-field">
+          <input id="import-suspended" type="checkbox">
+          <span>导入后暂不安排复习（不会今天就进队列）</span>
+        </label>
         <div class="modal-actions"><button class="button ghost close-followup-dialog" type="button">取消</button><button class="button primary" id="import-followups" type="button">选中题目入库</button></div>
       </div>
       <div id="followup-error" class="empty-state" hidden><div class="empty-mark error">!</div><h3>生成失败</h3><p id="followup-error-message"></p><button class="button primary" id="retry-followups" type="button">再试一次</button></div>

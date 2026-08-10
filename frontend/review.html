@@ -81,9 +81,12 @@
 
         <div id="review-empty" class="empty-state large" hidden>
           <div class="empty-mark">✓</div>
-          <h2>今天的复习完成了</h2>
-          <p>新的复习会按记忆间隔自动出现。</p>
-          <a class="button primary" href="/">去题库看看</a>
+          <h2 id="review-empty-title">今天的复习完成了</h2>
+          <p id="review-empty-copy">新的复习会按记忆间隔自动出现。</p>
+          <div class="empty-actions">
+            <a class="button primary" href="/">去题库看看</a>
+            <a class="button ghost" id="empty-today-link" href="/review.html" hidden>继续今日队列</a>
+          </div>
         </div>
 
         <div id="review-error" class="empty-state large" hidden>

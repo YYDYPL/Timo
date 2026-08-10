@@ -132,21 +132,27 @@ def _chat_json(system_prompt: str, user_prompt: str) -> Any:
 
 
 def generate_followup_questions(project: dict[str, Any], count: int = 6) -> list[dict[str, Any]]:
-    """Generate and validate 5-8 interview questions for a project."""
+    """Generate and validate 5-8 interview questions for a project.
+
+    Each question carries a reference ``answer`` (one concise, complete answer
+    a candidate could actually say) plus 3-7 ``keypoints``. Keeping both lets
+    imported questions work in the active-recall review flow.
+    """
 
     count = max(5, min(8, int(count)))
     system_prompt = (
         "你是资深技术面试官。根据候选人的真实项目生成有区分度的追问，覆盖架构取舍、"
-        "实现细节、故障排查、性能、数据一致性和复盘。只输出 JSON 对象，不要 Markdown。"
+        "实现细节、故障排查、性能、数据一致性和复盘。每道题都要附一段简洁完整的中文参考答案"
+        "（200-400 字，可被直接念出来）和 3-7 个要点。只输出 JSON 对象，不要 Markdown。"
     )
     user_prompt = f"""
 项目名称：{project.get('name', '')}
 项目描述：{project.get('description', '')}
 技术标签：{', '.join(project.get('tags', []) or [])}
 
-请生成 {count} 道可能被问到的中文追问。每题提供 3-7 个简洁答案要点。
+请生成 {count} 道可能被问到的中文追问。
 严格返回：
-{{"questions":[{{"question":"问题文本","keypoints":["要点1","要点2"]}}]}}
+{{"questions":[{{"question":"问题文本","answer":"参考答案","keypoints":["要点1","要点2"]}}]}}
 """.strip()
     payload = _chat_json(system_prompt, user_prompt)
     if isinstance(payload, dict):
@@ -161,22 +167,46 @@ def generate_followup_questions(project: dict[str, Any], count: int = 6) -> list
         if not isinstance(item, dict):
             continue
         question = str(item.get("question", "")).strip()
-        raw_keypoints = item.get("keypoints", [])
         if not question:
             continue
+        answer = str(item.get("answer", "") or "").strip()
+        raw_keypoints = item.get("keypoints", [])
         if isinstance(raw_keypoints, str):
             keypoints = [part.strip() for part in re.split(r"[\n;；]", raw_keypoints) if part.strip()]
         elif isinstance(raw_keypoints, list):
             keypoints = [str(part).strip() for part in raw_keypoints if str(part).strip()]
         else:
             keypoints = []
-        result.append({"question": question, "keypoints": keypoints[:7]})
+        result.append({"question": question, "answer": answer, "keypoints": keypoints[:7]})
         if len(result) >= count:
             break
 
     if not result:
         raise LLMError("LLM 没有生成可用的追问")
     return result
+
+
+def generate_reference_answer(question: str, keypoints: list[str]) -> str:
+    """Draft a concise reference answer from a question and its keypoints."""
+
+    system_prompt = (
+        "你是资深技术面试官。根据题目和给出的要点，撰写一段简明完整、条理清晰的中文参考答案"
+        "（200-500 字），覆盖全部要点。只输出 JSON 对象，不要 Markdown。"
+    )
+    user_prompt = f"""
+面试题：{question}
+关键要点：{json.dumps(keypoints, ensure_ascii=False)}
+
+返回：
+{{"answer":"完整参考答案"}}
+""".strip()
+    payload = _chat_json(system_prompt, user_prompt)
+    if not isinstance(payload, dict):
+        raise LLMError("LLM 参考答案格式不正确")
+    answer = str(payload.get("answer", "") or "").strip()
+    if not answer:
+        raise LLMError("LLM 没有生成参考答案")
+    return answer
 
 
 def evaluate_answer(
@@ -235,6 +265,7 @@ __all__ = [
     "LLMNotConfigured",
     "evaluate_answer",
     "generate_followup_questions",
+    "generate_reference_answer",
     "get_settings",
     "is_configured",
 ]

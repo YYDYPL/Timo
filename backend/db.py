@@ -12,7 +12,7 @@ import json
 import os
 import sqlite3
 from contextlib import contextmanager
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -21,10 +21,15 @@ BACKEND_DIR = Path(__file__).resolve().parent
 DB_PATH = Path(os.getenv("INTERVIEW_DB_PATH", str(BACKEND_DIR / "data.db")))
 
 
-def utc_now() -> str:
-    """Return an ISO timestamp with an explicit UTC offset."""
+def local_now() -> str:
+    """Return a local-time ISO timestamp (naive, no timezone offset).
 
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    The rest of the app schedules on ``date.today()`` (local wall clock), so
+    review timestamps must come from the same clock or they drift a day for
+    users east/west of UTC around midnight.
+    """
+
+    return datetime.now().isoformat(timespec="seconds")
 
 
 def today_iso() -> str:
@@ -90,6 +95,7 @@ def init_db() -> None:
                 repetitions INTEGER NOT NULL DEFAULT 0,
                 due_date TEXT NOT NULL,
                 last_reviewed_at TEXT,
+                suspended INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY(question_id) REFERENCES questions(id) ON DELETE CASCADE
             );
 
@@ -117,6 +123,15 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_review_logs_reviewed_at ON review_logs(reviewed_at);
             """
         )
+        _migrate(conn)
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Add columns introduced after the original schema in-place."""
+
+    review_columns = {row[1] for row in conn.execute("PRAGMA table_info(reviews)").fetchall()}
+    if "suspended" not in review_columns:
+        conn.execute("ALTER TABLE reviews ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0")
 
 
 def row_to_question(row: sqlite3.Row | None) -> dict[str, Any] | None:
@@ -142,14 +157,14 @@ def row_to_review(row: sqlite3.Row | None) -> dict[str, Any] | None:
     return item
 
 
-def ensure_review(conn: sqlite3.Connection, question_id: int, due_date: str | None = None) -> None:
+def ensure_review(conn: sqlite3.Connection, question_id: int, due_date: str | None = None, suspended: bool = False) -> None:
     conn.execute(
         """
-        INSERT INTO reviews(question_id, ease_factor, interval, repetitions, due_date)
-        VALUES (?, 2.5, 0, 0, ?)
+        INSERT INTO reviews(question_id, ease_factor, interval, repetitions, due_date, suspended)
+        VALUES (?, 2.5, 0, 0, ?, ?)
         ON CONFLICT(question_id) DO NOTHING
         """,
-        (question_id, due_date or today_iso()),
+        (question_id, due_date or today_iso(), int(bool(suspended))),
     )
 
 
@@ -162,8 +177,9 @@ def insert_question(
     keypoints: list[str],
     difficulty: int = 3,
     source: str = "",
+    suspended: bool = False,
 ) -> dict[str, Any]:
-    now = utc_now()
+    now = local_now()
     with get_db() as conn:
         cur = conn.execute(
             """
@@ -173,7 +189,7 @@ def insert_question(
             (category, topic, question, answer, dumps(keypoints), difficulty, source, now),
         )
         qid = int(cur.lastrowid)
-        ensure_review(conn, qid)
+        ensure_review(conn, qid, suspended=suspended)
         return row_to_question(conn.execute("SELECT * FROM questions WHERE id = ?", (qid,)).fetchone()) or {}
 
 
@@ -190,9 +206,9 @@ __all__ = [
     "init_db",
     "insert_question",
     "loads",
+    "local_now",
     "row_to_project",
     "row_to_question",
     "row_to_review",
     "today_iso",
-    "utc_now",
 ]

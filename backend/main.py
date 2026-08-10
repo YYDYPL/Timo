@@ -22,14 +22,23 @@ try:
         init_db,
         insert_question,
         loads,
+        local_now,
         row_to_project,
         row_to_question,
         today_iso,
-        utc_now,
     )
-    from .llm import LLMError, LLMNotConfigured, evaluate_answer, generate_followup_questions, is_configured
+    from .llm import (
+        LLMError,
+        LLMNotConfigured,
+        evaluate_answer,
+        generate_followup_questions,
+        generate_reference_answer,
+        is_configured,
+    )
     from .models import (
         EvaluateAnswerRequest,
+        FollowupQuestionOut,
+        GenerateAnswerRequest,
         GenerateFollowupsRequest,
         ImportFollowupsRequest,
         ProjectCreate,
@@ -50,14 +59,23 @@ except ImportError:  # Allows: uvicorn main:app from inside backend/
         init_db,
         insert_question,
         loads,
+        local_now,
         row_to_project,
         row_to_question,
         today_iso,
-        utc_now,
     )
-    from llm import LLMError, LLMNotConfigured, evaluate_answer, generate_followup_questions, is_configured  # type: ignore
+    from llm import (  # type: ignore
+        LLMError,
+        LLMNotConfigured,
+        evaluate_answer,
+        generate_followup_questions,
+        generate_reference_answer,
+        is_configured,
+    )
     from models import (  # type: ignore
         EvaluateAnswerRequest,
+        FollowupQuestionOut,
+        GenerateAnswerRequest,
         GenerateFollowupsRequest,
         ImportFollowupsRequest,
         ProjectCreate,
@@ -128,6 +146,7 @@ def _joined_question(row: Any) -> dict[str, Any]:
             "repetitions": row["review_repetitions"] if row["review_repetitions"] is not None else 0,
             "due_date": row["review_due_date"] or today_iso(),
             "last_reviewed_at": row["review_last_reviewed_at"],
+            "suspended": bool(row["review_suspended"]) if row["review_suspended"] is not None else False,
         }
     return item
 
@@ -138,7 +157,8 @@ QUESTION_WITH_REVIEW_SQL = """
            r.interval AS review_interval,
            r.repetitions AS review_repetitions,
            r.due_date AS review_due_date,
-           r.last_reviewed_at AS review_last_reviewed_at
+           r.last_reviewed_at AS review_last_reviewed_at,
+           r.suspended AS review_suspended
     FROM questions q
     LEFT JOIN reviews r ON r.question_id = q.id
 """
@@ -268,6 +288,8 @@ def update_question(question_id: int, payload: QuestionUpdate) -> dict[str, Any]
     values = _model_dict(payload, exclude_unset=True)
     if not values:
         return _require_question(question_id)
+    # suspended lives on the reviews row, not on questions.
+    suspended_value = values.pop("suspended", None)
     if "question" in values:
         values["question"] = (values["question"] or "").strip()
         if not values["question"]:
@@ -280,12 +302,18 @@ def update_question(question_id: int, payload: QuestionUpdate) -> dict[str, Any]
     if "keypoints" in values:
         values["keypoints"] = dumps(_clean_list(values["keypoints"]))
 
-    assignments = ", ".join(f"{field} = ?" for field in values)
     with get_db() as conn:
-        conn.execute(
-            f"UPDATE questions SET {assignments} WHERE id = ?",
-            [*values.values(), question_id],
-        )
+        if values:
+            assignments = ", ".join(f"{field} = ?" for field in values)
+            conn.execute(
+                f"UPDATE questions SET {assignments} WHERE id = ?",
+                [*values.values(), question_id],
+            )
+        if suspended_value is not None:
+            conn.execute(
+                "UPDATE reviews SET suspended = ? WHERE question_id = ?",
+                (int(bool(suspended_value)), question_id),
+            )
         row = conn.execute("SELECT * FROM questions WHERE id = ?", (question_id,)).fetchone()
     return row_to_question(row) or {}
 
@@ -312,11 +340,17 @@ def today_review_queue(
     target = (on_date or date.today()).isoformat()
     sql = (
         QUESTION_WITH_REVIEW_SQL
-        + " WHERE r.due_date <= ? ORDER BY r.due_date ASC, r.repetitions ASC, q.difficulty DESC, q.id ASC LIMIT ?"
+        + " WHERE COALESCE(r.suspended,0) = 0 AND r.due_date <= ?"
+        " ORDER BY r.due_date ASC, r.repetitions ASC, q.difficulty DESC, q.id ASC LIMIT ?"
     )
     with get_db() as conn:
         rows = conn.execute(sql, (target, limit)).fetchall()
-        total = int(conn.execute("SELECT COUNT(*) FROM reviews WHERE due_date <= ?", (target,)).fetchone()[0])
+        total = int(
+            conn.execute(
+                "SELECT COUNT(*) FROM reviews WHERE COALESCE(suspended,0) = 0 AND due_date <= ?",
+                (target,),
+            ).fetchone()[0]
+        )
     return {"date": target, "total": total, "items": [_joined_question(row) for row in rows]}
 
 
@@ -324,7 +358,7 @@ def today_review_queue(
 @app.post("/api/reviews/{question_id}", include_in_schema=False)
 def submit_review(question_id: int, payload: ReviewSubmit) -> dict[str, Any]:
     _require_question(question_id)
-    reviewed_at = utc_now()
+    reviewed_at = local_now()
     with get_db() as conn:
         ensure_review(conn, question_id)
         current_row = conn.execute("SELECT * FROM reviews WHERE question_id = ?", (question_id,)).fetchone()
@@ -333,7 +367,7 @@ def submit_review(question_id: int, payload: ReviewSubmit) -> dict[str, Any]:
         conn.execute(
             """
             UPDATE reviews
-            SET ease_factor = ?, interval = ?, repetitions = ?, due_date = ?, last_reviewed_at = ?
+            SET ease_factor = ?, interval = ?, repetitions = ?, due_date = ?, last_reviewed_at = ?, suspended = 0
             WHERE question_id = ?
             """,
             (
@@ -354,7 +388,10 @@ def submit_review(question_id: int, payload: ReviewSubmit) -> dict[str, Any]:
         )
         row = conn.execute("SELECT * FROM reviews WHERE question_id = ?", (question_id,)).fetchone()
         remaining = int(
-            conn.execute("SELECT COUNT(*) FROM reviews WHERE due_date <= ?", (today_iso(),)).fetchone()[0]
+            conn.execute(
+                "SELECT COUNT(*) FROM reviews WHERE COALESCE(suspended,0) = 0 AND due_date <= ?",
+                (today_iso(),),
+            ).fetchone()[0]
         )
     return {
         "question_id": question_id,
@@ -414,7 +451,7 @@ def create_project(payload: ProjectCreate) -> dict[str, Any]:
     with get_db() as conn:
         cur = conn.execute(
             "INSERT INTO projects(name, description, tags, created_at) VALUES (?, ?, ?, ?)",
-            (name, values["description"].strip(), dumps(_clean_list(values["tags"])), utc_now()),
+            (name, values["description"].strip(), dumps(_clean_list(values["tags"])), local_now()),
         )
         row = conn.execute("SELECT * FROM projects WHERE id = ?", (cur.lastrowid,)).fetchone()
     return row_to_project(row) or {}
@@ -451,7 +488,7 @@ def delete_project(project_id: int) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-def _save_followups(project: dict[str, Any], items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _save_followups(project: dict[str, Any], items: list[dict[str, Any]], suspended: bool = False) -> list[dict[str, Any]]:
     topic = (project.get("tags") or [project["name"]])[0]
     saved = []
     for item in items:
@@ -460,10 +497,11 @@ def _save_followups(project: dict[str, Any], items: list[dict[str, Any]]) -> lis
                 category="项目",
                 topic=str(topic),
                 question=str(item["question"]).strip(),
-                answer="",
+                answer=str(item.get("answer", "") or "").strip(),
                 keypoints=_clean_list(item.get("keypoints", [])),
                 difficulty=4,
                 source=f"AI 追问 · {project['name']}",
+                suspended=bool(suspended),
             )
         )
     return saved
@@ -486,7 +524,7 @@ def import_project_followups(project_id: int, payload: ImportFollowupsRequest) -
     items = [_model_dict(item) for item in payload.questions if item.question.strip()]
     if not items:
         raise HTTPException(status_code=422, detail="至少需要一道追问")
-    saved = _save_followups(project, items)
+    saved = _save_followups(project, items, payload.suspended)
     return {"project_id": project_id, "count": len(saved), "items": saved}
 
 
@@ -527,6 +565,19 @@ def ai_status() -> dict[str, bool]:
     return {"configured": is_configured()}
 
 
+@app.post("/api/ai/generate-answer")
+def ai_generate_answer(payload: GenerateAnswerRequest) -> dict[str, Any]:
+    question = (payload.question or "").strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="请先填写题目内容")
+    keypoints = _clean_list(payload.keypoints)
+    try:
+        answer = generate_reference_answer(question, keypoints)
+    except LLMError as exc:
+        raise _llm_http_error(exc) from exc
+    return {"answer": answer}
+
+
 # ---------------------------------------------------------------------------
 # Progress statistics
 
@@ -538,7 +589,7 @@ def get_stats(recent_limit: int = Query(default=20, ge=1, le=100)) -> dict[str, 
         cards = conn.execute(
             """
             SELECT q.id, q.category, q.topic, q.question,
-                   r.ease_factor, r.interval, r.repetitions, r.due_date, r.last_reviewed_at
+                   r.ease_factor, r.interval, r.repetitions, r.due_date, r.last_reviewed_at, r.suspended
             FROM questions q
             LEFT JOIN reviews r ON r.question_id = q.id
             ORDER BY q.id
@@ -567,7 +618,8 @@ def get_stats(recent_limit: int = Query(default=20, ge=1, le=100)) -> dict[str, 
         card = dict(row)
         score = mastery_score(card)
         mastered = int(card.get("repetitions") or 0) >= 3
-        due = not card.get("due_date") or card["due_date"] <= target
+        suspended = int(card.get("suspended") or 0)
+        due = not suspended and (not card.get("due_date") or card["due_date"] <= target)
         score_sum += score
         mastered_count += int(mastered)
         today_due += int(due)

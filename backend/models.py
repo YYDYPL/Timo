@@ -15,6 +15,7 @@ class QuestionBase(BaseModel):
     keypoints: list[str] = Field(default_factory=list)
     difficulty: int = Field(default=3, ge=1, le=5)
     source: str = ""
+    suspended: bool = False
 
 
 class QuestionCreate(QuestionBase):
@@ -29,6 +30,7 @@ class QuestionUpdate(BaseModel):
     keypoints: Optional[list[str]] = None
     difficulty: Optional[int] = Field(default=None, ge=1, le=5)
     source: Optional[str] = None
+    suspended: Optional[bool] = None
 
 
 class QuestionOut(QuestionBase):
@@ -79,8 +81,14 @@ class EvaluateAnswerRequest(BaseModel):
     keypoints: Optional[list[str]] = None
 
 
+class GenerateAnswerRequest(BaseModel):
+    question: str
+    keypoints: list[str] = Field(default_factory=list)
+
+
 class FollowupQuestionOut(BaseModel):
     question: str
+    answer: str = ""
     keypoints: list[str] = Field(default_factory=list)
 
 
@@ -91,6 +99,7 @@ class GenerateFollowupsRequest(BaseModel):
 
 class ImportFollowupsRequest(BaseModel):
     questions: list[FollowupQuestionOut] = Field(default_factory=list)
+    suspended: bool = False
 
 
 class StatsOut(BaseModel):
@@ -106,6 +115,7 @@ class StatsOut(BaseModel):
 __all__ = [
     "EvaluateAnswerRequest",
     "FollowupQuestionOut",
+    "GenerateAnswerRequest",
     "GenerateFollowupsRequest",
     "ImportFollowupsRequest",
     "ProjectCreate",

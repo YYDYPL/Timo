@@ -241,6 +241,7 @@
       list.innerHTML = items.map((item) => {
         const keypoints = normalizeStringList(item.keypoints);
         const repetitions = numberValue(item.review?.repetitions);
+        const suspended = Boolean(item.review?.suspended);
         const detailId = `question-detail-${item.id}`;
         return `
           <article class="question-item" data-question-id="${item.id}">
@@ -249,12 +250,14 @@
                 <strong>${escapeHtml(item.question)}</strong>
                 <div class="question-title-meta">
                   <span class="category-badge ${categoryClass(item.category)}">${escapeHtml(categoryLabel(item.category))}</span>
+                  ${suspended ? '<span class="muted-label">待安排</span>' : ""}
                   ${repetitions ? `<span class="muted-label">复习 ${repetitions} 次</span>` : ""}
                 </div>
               </div>
               <span class="topic-label" title="${escapeHtml(item.topic || "未分类")}">${escapeHtml(item.topic || "未分类")}</span>
               ${difficultyMarkup(item.difficulty)}
               <div class="row-actions">
+                <button class="button ghost small review-question" type="button" title="立即复习这道题">背</button>
                 <button class="button ghost small view-question" type="button" aria-expanded="false" aria-controls="${detailId}">查看</button>
                 <button class="button ghost small edit-question" type="button">编辑</button>
                 <button class="icon-button delete-question" type="button" aria-label="删除题目" title="删除">×</button>
@@ -281,14 +284,17 @@
       $("#question-keypoints").value = normalizeStringList(question?.keypoints).join("\n");
       $("#question-difficulty").value = String(question?.difficulty || 3);
       $("#question-source").value = question?.source || "";
+      $("#question-suspended").checked = Boolean(question?.review?.suspended);
       openDialog(dialog);
       window.setTimeout(() => $("#question-text").focus(), 30);
     }
 
     async function loadQuestions() {
       try {
-        const payload = await api("/api/questions");
+        const [payload, aiConfigured] = await Promise.all([api("/api/questions"), updateAiStatus()]);
         state.questions = asList(payload).map(normalizeQuestion);
+        $("#generate-answer").disabled = !aiConfigured;
+        $("#generate-answer").title = aiConfigured ? "" : "请先在 .env 中配置 LLM";
         refreshTopicOptions();
         renderQuestions();
       } catch (error) {
@@ -299,6 +305,30 @@
 
     $("#new-question").addEventListener("click", () => openQuestionForm());
     $$(".close-dialog").forEach((button) => button.addEventListener("click", () => closeDialog(dialog)));
+
+    $("#generate-answer").addEventListener("click", async () => {
+      const questionText = $("#question-text").value.trim();
+      if (!questionText) {
+        toast("先写题目", "AI 需要题目内容才能生成参考答案。", "error");
+        return;
+      }
+      const keypoints = $("#question-keypoints").value.split(/\r?\n/)
+        .map((point) => point.replace(/^[-*•]\s*/, "").trim()).filter(Boolean);
+      const button = $("#generate-answer");
+      setButtonBusy(button, true, "生成中…");
+      try {
+        const result = await api("/api/ai/generate-answer", {
+          method: "POST",
+          body: { question: questionText, keypoints },
+        });
+        $("#question-answer").value = result.answer || "";
+        toast("参考答案已生成", "已填入参考答案文本框，可继续编辑。");
+      } catch (error) {
+        toast(error.status === 503 ? "AI 尚未配置" : "生成失败", error.message, "error");
+      } finally {
+        setButtonBusy(button, false);
+      }
+    });
     [searchInput, categoryFilter, topicFilter].forEach((control) => control.addEventListener(control === searchInput ? "input" : "change", () => {
       if (control === categoryFilter) refreshTopicOptions();
       renderQuestions();
@@ -321,6 +351,10 @@
       const id = Number(itemElement?.dataset.questionId);
       const question = state.questions.find((item) => Number(item.id) === id);
       if (!question) return;
+      if (action.classList.contains("review-question")) {
+        window.location.href = `/review.html?id=${id}`;
+        return;
+      }
       if (action.classList.contains("view-question")) {
         const detail = $(`#question-detail-${id}`);
         detail.hidden = !detail.hidden;
@@ -357,6 +391,7 @@
         keypoints: $("#question-keypoints").value.split(/\r?\n/).map((point) => point.replace(/^[-*•]\s*/, "").trim()).filter(Boolean),
         difficulty: Number($("#question-difficulty").value),
         source: $("#question-source").value.trim(),
+        suspended: $("#question-suspended").checked,
       };
       setButtonBusy(saveButton, true, "保存中…");
       try {
@@ -379,7 +414,9 @@
   // Active recall review
 
   function initReviewPage() {
-    const state = { queue: [], current: null, attempts: 0, evaluation: null, aiConfigured: true, sourceTotal: 0 };
+    const state = { queue: [], current: null, attempts: 0, evaluation: null, aiConfigured: true, sourceTotal: 0, forcedId: null };
+    const rawId = new URLSearchParams(window.location.search).get("id");
+    state.forcedId = rawId && Number.isInteger(Number(rawId)) && Number(rawId) > 0 ? Number(rawId) : null;
     const loading = $("#review-loading");
     const card = $("#review-card");
     const empty = $("#review-empty");
@@ -405,7 +442,16 @@
         card.hidden = true;
         empty.hidden = false;
         updateProgress(true);
-        setDueBadge(0);
+        $("#empty-today-link").hidden = !state.forcedId;
+        if (state.forcedId) {
+          $("#review-empty-title").textContent = "这道题复习完了";
+          $("#review-empty-copy").textContent = "记住的题会按记忆间隔自动安排。";
+          loadNavSnapshot();
+        } else {
+          $("#review-empty-title").textContent = "今天的复习完成了";
+          $("#review-empty-copy").textContent = "新的复习会按记忆间隔自动出现。";
+          setDueBadge(0);
+        }
         return;
       }
 
@@ -440,6 +486,20 @@
       state.current = null;
       state.attempts = 0;
       try {
+        if (state.forcedId) {
+          // Single-question review: drill one card regardless of its due date.
+          const [question, aiConfigured] = await Promise.all([
+            api(`/api/questions/${state.forcedId}`),
+            updateAiStatus(),
+          ]);
+          state.aiConfigured = aiConfigured;
+          state.queue = [normalizeQuestion(question)];
+          state.sourceTotal = 1;
+          loading.hidden = true;
+          loadNavSnapshot();
+          showNextQuestion();
+          return;
+        }
         const [payload, aiConfigured] = await Promise.all([
           api("/api/review/today"),
           updateAiStatus(),
@@ -611,7 +671,11 @@
         return `
           <label class="followup-item">
             <span class="followup-check"><input class="followup-select" type="checkbox" value="${index}" checked></span>
-            <span><h3>${escapeHtml(item.question)}</h3><span class="followup-keypoints">${points.map((point) => `<span>${escapeHtml(point)}</span>`).join("")}</span></span>
+            <span>
+              <h3>${escapeHtml(item.question)}</h3>
+              ${item.answer ? `<p class="followup-answer">${escapeHtml(item.answer)}</p>` : ""}
+              <span class="followup-keypoints">${points.map((point) => `<span>${escapeHtml(point)}</span>`).join("")}</span>
+            </span>
           </label>`;
       }).join("");
       refreshFollowupSelection();
@@ -631,6 +695,7 @@
         });
         state.followups = asList(payload).map((item) => ({
           question: String(item.question || "").trim(),
+          answer: String(item.answer || "").trim(),
           keypoints: normalizeStringList(item.keypoints),
         })).filter((item) => item.question);
         if (!state.followups.length) throw new Error("模型没有返回可用的追问，请再试一次。");
@@ -709,7 +774,10 @@
       try {
         const result = await api(`/api/projects/${state.currentProject.id}/followups`, {
           method: "POST",
-          body: { questions: selected.map((item) => ({ question: item.question, keypoints: item.keypoints })) },
+          body: {
+            questions: selected.map((item) => ({ question: item.question, answer: item.answer, keypoints: item.keypoints })),
+            suspended: $("#import-suspended").checked,
+          },
         });
         closeDialog(followupDialog);
         toast("追问已加入题库", `共 ${numberValue(result.count, selected.length)} 道题`);

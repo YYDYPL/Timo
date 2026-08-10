@@ -96,6 +96,7 @@
       </div>
       <label class="field"><span>题目</span><textarea id="question-text" rows="3" maxlength="2000" required></textarea></label>
       <label class="field"><span>参考答案</span><textarea id="question-answer" rows="6" maxlength="12000"></textarea></label>
+      <button class="button secondary small" id="generate-answer" type="button" disabled>用 AI 生成参考答案</button>
       <label class="field"><span>关键要点</span><textarea id="question-keypoints" rows="5" maxlength="6000" placeholder="每行一个要点"></textarea></label>
       <div class="form-grid two-columns">
         <label class="field"><span>难度</span>
@@ -105,6 +106,10 @@
         </label>
         <label class="field"><span>来源</span><input id="question-source" type="text" maxlength="200" placeholder="书籍、面经或项目"></label>
       </div>
+      <label class="field checkbox-field">
+        <input id="question-suspended" type="checkbox">
+        <span>暂不安排复习（新题不进入今日队列）</span>
+      </label>
       <div class="modal-actions">
         <button class="button ghost close-dialog" type="button">取消</button>
         <button class="button primary" id="save-question" type="submit">保存题目</button>

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#196f5a">
+  <title>题库 · Timo 面试背题</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body data-page="questions">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Timo 首页">
+        <span class="brand-mark">T</span>
+        <span><strong>Timo</strong><small>面试背题</small></span>
+      </a>
+      <nav class="primary-nav" aria-label="主导航">
+        <a href="/" data-nav="questions"><span class="nav-mark">题</span><span>题库</span></a>
+        <a href="/review.html" data-nav="review"><span class="nav-mark">复</span><span>今日复习</span><span class="nav-count" data-due-count hidden></span></a>
+        <a href="/project.html" data-nav="projects"><span class="nav-mark">项</span><span>项目库</span></a>
+        <a href="/stats.html" data-nav="stats"><span class="nav-mark">统</span><span>统计</span></a>
+      </nav>
+      <div class="sidebar-status"><span class="status-dot"></span><span>本地数据</span></div>
+    </aside>
+
+    <main class="main-content">
+      <header class="mobile-header">
+        <a class="mobile-brand" href="/"><span class="brand-mark">T</span><strong>Timo</strong></a>
+        <span class="mobile-page-title">题库</span>
+      </header>
+
+      <section class="page-wrap">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">QUESTION BANK</p>
+            <h1>题库</h1>
+            <p class="page-summary"><span id="question-count">--</span> 道题，按自己的节奏逐个攻克。</p>
+          </div>
+          <button class="button primary" id="new-question" type="button"><span aria-hidden="true">＋</span> 新建题目</button>
+        </div>
+
+        <div class="filter-bar" aria-label="题库筛选">
+          <label class="search-field">
+            <span class="sr-only">搜索题目、答案或要点</span>
+            <span class="search-symbol" aria-hidden="true"></span>
+            <input id="question-search" type="search" placeholder="搜索题目、答案或要点" autocomplete="off">
+          </label>
+          <label class="compact-field">
+            <span class="sr-only">分类</span>
+            <select id="category-filter">
+              <option value="">全部分类</option>
+              <option value="八股">八股</option>
+              <option value="agent">Agent</option>
+              <option value="项目">项目</option>
+            </select>
+          </label>
+          <label class="compact-field">
+            <span class="sr-only">主题</span>
+            <select id="topic-filter">
+              <option value="">全部主题</option>
+            </select>
+          </label>
+          <button class="button ghost small" id="clear-filters" type="button" hidden>清除筛选</button>
+        </div>
+
+        <div class="question-list-shell">
+          <div class="question-list-head" aria-hidden="true">
+            <span>题目</span><span>主题</span><span>难度</span><span>操作</span>
+          </div>
+          <div id="question-list" class="question-list" aria-live="polite">
+            <div class="skeleton-list" aria-label="正在加载题库">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="question-dialog" class="modal">
+    <form id="question-form" class="modal-form">
+      <div class="modal-header">
+        <div><p class="eyebrow">QUESTION</p><h2 id="question-dialog-title">新建题目</h2></div>
+        <button class="icon-button close-dialog" type="button" aria-label="关闭" title="关闭">×</button>
+      </div>
+      <input id="question-id" type="hidden">
+      <div class="form-grid two-columns">
+        <label class="field"><span>分类</span>
+          <select id="question-category" required>
+            <option value="八股">八股</option>
+            <option value="agent">Agent</option>
+            <option value="项目">项目</option>
+          </select>
+        </label>
+        <label class="field"><span>主题</span><input id="question-topic" type="text" maxlength="80" placeholder="如 JVM、并发、RAG" required></label>
+      </div>
+      <label class="field"><span>题目</span><textarea id="question-text" rows="3" maxlength="2000" required></textarea></label>
+      <label class="field"><span>参考答案</span><textarea id="question-answer" rows="6" maxlength="12000"></textarea></label>
+      <label class="field"><span>关键要点</span><textarea id="question-keypoints" rows="5" maxlength="6000" placeholder="每行一个要点"></textarea></label>
+      <div class="form-grid two-columns">
+        <label class="field"><span>难度</span>
+          <select id="question-difficulty">
+            <option value="1">1 · 入门</option><option value="2">2 · 基础</option><option value="3" selected>3 · 中等</option><option value="4">4 · 进阶</option><option value="5">5 · 困难</option>
+          </select>
+        </label>
+        <label class="field"><span>来源</span><input id="question-source" type="text" maxlength="200" placeholder="书籍、面经或项目"></label>
+      </div>
+      <div class="modal-actions">
+        <button class="button ghost close-dialog" type="button">取消</button>
+        <button class="button primary" id="save-question" type="submit">保存题目</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast-region" class="toast-region" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

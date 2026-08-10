@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#196f5a">
+  <title>项目库 · Timo 面试背题</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body data-page="projects">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Timo 首页"><span class="brand-mark">T</span><span><strong>Timo</strong><small>面试背题</small></span></a>
+      <nav class="primary-nav" aria-label="主导航">
+        <a href="/" data-nav="questions"><span class="nav-mark">题</span><span>题库</span></a>
+        <a href="/review.html" data-nav="review"><span class="nav-mark">复</span><span>今日复习</span><span class="nav-count" data-due-count hidden></span></a>
+        <a href="/project.html" data-nav="projects"><span class="nav-mark">项</span><span>项目库</span></a>
+        <a href="/stats.html" data-nav="stats"><span class="nav-mark">统</span><span>统计</span></a>
+      </nav>
+      <div class="sidebar-status"><span class="status-dot"></span><span>本地数据</span></div>
+    </aside>
+
+    <main class="main-content">
+      <header class="mobile-header"><a class="mobile-brand" href="/"><span class="brand-mark">T</span><strong>Timo</strong></a><span class="mobile-page-title">项目库</span></header>
+      <section class="page-wrap">
+        <div class="page-heading">
+          <div><p class="eyebrow">PROJECT STORIES</p><h1>项目库</h1><p class="page-summary">把项目经历变成面试官会继续追问的问题。</p></div>
+          <button class="button primary" id="new-project" type="button"><span aria-hidden="true">＋</span> 添加项目</button>
+        </div>
+
+        <div id="project-list" class="project-grid" aria-live="polite">
+          <div class="project-skeleton"></div><div class="project-skeleton"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="project-dialog" class="modal compact-modal">
+    <form id="project-form" class="modal-form">
+      <div class="modal-header">
+        <div><p class="eyebrow">PROJECT</p><h2 id="project-dialog-title">添加项目</h2></div>
+        <button class="icon-button close-project-dialog" type="button" aria-label="关闭" title="关闭">×</button>
+      </div>
+      <input id="project-id" type="hidden">
+      <label class="field"><span>项目名称</span><input id="project-name" type="text" maxlength="120" required></label>
+      <label class="field"><span>项目描述</span><textarea id="project-description" rows="8" maxlength="8000" placeholder="技术栈、职责、难点、结果…" required></textarea></label>
+      <label class="field"><span>标签</span><input id="project-tags" type="text" maxlength="500" placeholder="Java, RAG, 高并发（逗号分隔）"></label>
+      <div class="modal-actions"><button class="button ghost close-project-dialog" type="button">取消</button><button class="button primary" id="save-project" type="submit">保存项目</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="followup-dialog" class="modal followup-modal">
+    <div class="modal-form">
+      <div class="modal-header">
+        <div><p class="eyebrow">AI FOLLOW-UPS</p><h2 id="followup-title">项目追问</h2></div>
+        <button class="icon-button close-followup-dialog" type="button" aria-label="关闭" title="关闭">×</button>
+      </div>
+      <div id="followup-loading" class="center-state compact"><span class="spinner" aria-hidden="true"></span><p>正在生成追问…</p></div>
+      <div id="followup-content" hidden>
+        <div class="selection-toolbar"><label class="check-label"><input id="select-all-followups" type="checkbox" checked><span>全选</span></label><span id="followup-count" class="muted-label"></span></div>
+        <div id="followup-list" class="followup-list"></div>
+        <div class="modal-actions"><button class="button ghost close-followup-dialog" type="button">取消</button><button class="button primary" id="import-followups" type="button">选中题目入库</button></div>
+      </div>
+      <div id="followup-error" class="empty-state" hidden><div class="empty-mark error">!</div><h3>生成失败</h3><p id="followup-error-message"></p><button class="button primary" id="retry-followups" type="button">再试一次</button></div>
+    </div>
+  </dialog>
+
+  <div id="toast-region" class="toast-region" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

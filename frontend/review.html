@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#196f5a">
+  <title>今日复习 · Timo 面试背题</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body data-page="review">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Timo 首页"><span class="brand-mark">T</span><span><strong>Timo</strong><small>面试背题</small></span></a>
+      <nav class="primary-nav" aria-label="主导航">
+        <a href="/" data-nav="questions"><span class="nav-mark">题</span><span>题库</span></a>
+        <a href="/review.html" data-nav="review"><span class="nav-mark">复</span><span>今日复习</span><span class="nav-count" data-due-count hidden></span></a>
+        <a href="/project.html" data-nav="projects"><span class="nav-mark">项</span><span>项目库</span></a>
+        <a href="/stats.html" data-nav="stats"><span class="nav-mark">统</span><span>统计</span></a>
+      </nav>
+      <div class="sidebar-status"><span class="status-dot"></span><span>本地数据</span></div>
+    </aside>
+
+    <main class="main-content">
+      <header class="mobile-header"><a class="mobile-brand" href="/"><span class="brand-mark">T</span><strong>Timo</strong></a><span class="mobile-page-title">今日复习</span></header>
+      <section class="page-wrap review-page">
+        <div class="review-topline">
+          <div>
+            <p class="eyebrow">ACTIVE RECALL</p>
+            <h1>今日复习</h1>
+          </div>
+          <div class="review-progress-copy"><strong id="review-progress-label">0 / 0</strong><span>完成进度</span></div>
+        </div>
+        <div class="progress-track" aria-hidden="true"><span id="review-progress-bar"></span></div>
+
+        <div id="review-loading" class="center-state">
+          <span class="spinner" aria-hidden="true"></span><p>正在整理今日队列…</p>
+        </div>
+
+        <article id="review-card" class="review-card" hidden>
+          <div class="review-meta">
+            <span id="review-category" class="category-badge"></span>
+            <span id="review-topic" class="topic-label"></span>
+            <span id="review-position" class="muted-label"></span>
+          </div>
+          <h2 id="review-question"></h2>
+
+          <div id="recall-panel" class="recall-panel">
+            <label class="field answer-draft"><span>我的回答</span><textarea id="recall-answer" rows="6" placeholder="先写下或口述你能想到的要点…"></textarea></label>
+            <div class="recall-actions">
+              <button class="button ghost" id="skip-question" type="button">稍后再看</button>
+              <button class="button primary" id="reveal-answer" type="button">显示答案</button>
+            </div>
+          </div>
+
+          <div id="answer-panel" class="answer-panel" hidden>
+            <div class="answer-section">
+              <p class="section-label">参考答案</p>
+              <div id="review-answer" class="answer-copy"></div>
+            </div>
+            <div class="answer-section">
+              <p class="section-label">关键要点</p>
+              <ul id="review-keypoints" class="keypoint-list"></ul>
+            </div>
+            <div class="ai-evaluation-row">
+              <button class="button secondary" id="evaluate-answer" type="button">AI 评估我的回答</button>
+              <span class="muted-label">需填写回答并配置 LLM</span>
+            </div>
+            <div id="evaluation-panel" class="evaluation-panel" hidden></div>
+
+            <div class="rating-block">
+              <p class="section-label">这次记得怎么样？</p>
+              <div class="rating-actions">
+                <button class="rating-button again" type="button" data-quality="1"><strong>重来</strong><span>还没记住</span></button>
+                <button class="rating-button hard" type="button" data-quality="3"><strong>困难</strong><span>勉强想起</span></button>
+                <button class="rating-button good" type="button" data-quality="4"><strong>良好</strong><span>基本掌握</span></button>
+                <button class="rating-button easy" type="button" data-quality="5"><strong>简单</strong><span>非常熟练</span></button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <div id="review-empty" class="empty-state large" hidden>
+          <div class="empty-mark">✓</div>
+          <h2>今天的复习完成了</h2>
+          <p>新的复习会按记忆间隔自动出现。</p>
+          <a class="button primary" href="/">去题库看看</a>
+        </div>
+
+        <div id="review-error" class="empty-state large" hidden>
+          <div class="empty-mark error">!</div><h2>队列加载失败</h2><p id="review-error-message"></p><button class="button primary" id="retry-review" type="button">重新加载</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div id="toast-region" class="toast-region" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

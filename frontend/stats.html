@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#196f5a">
+  <title>学习统计 · Timo 面试背题</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body data-page="stats">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Timo 首页"><span class="brand-mark">T</span><span><strong>Timo</strong><small>面试背题</small></span></a>
+      <nav class="primary-nav" aria-label="主导航">
+        <a href="/" data-nav="questions"><span class="nav-mark">题</span><span>题库</span></a>
+        <a href="/review.html" data-nav="review"><span class="nav-mark">复</span><span>今日复习</span><span class="nav-count" data-due-count hidden></span></a>
+        <a href="/project.html" data-nav="projects"><span class="nav-mark">项</span><span>项目库</span></a>
+        <a href="/stats.html" data-nav="stats"><span class="nav-mark">统</span><span>统计</span></a>
+      </nav>
+      <div class="sidebar-status"><span class="status-dot"></span><span>本地数据</span></div>
+    </aside>
+
+    <main class="main-content">
+      <header class="mobile-header"><a class="mobile-brand" href="/"><span class="brand-mark">T</span><strong>Timo</strong></a><span class="mobile-page-title">统计</span></header>
+      <section class="page-wrap">
+        <div class="page-heading stats-heading"><div><p class="eyebrow">PROGRESS</p><h1>学习统计</h1><p class="page-summary">看清进度，也看清下一步该补哪里。</p></div><a class="button primary" href="/review.html">开始今日复习</a></div>
+
+        <div id="stats-loading" class="center-state"><span class="spinner" aria-hidden="true"></span><p>正在汇总学习记录…</p></div>
+        <div id="stats-content" hidden>
+          <div class="metric-grid">
+            <article class="metric-card due"><p>今日待复习</p><strong id="stat-due">0</strong><a href="/review.html">进入队列 <span aria-hidden="true">→</span></a></article>
+            <article class="metric-card"><p>题库总量</p><strong id="stat-total">0</strong><span>道题</span></article>
+            <article class="metric-card"><p>已掌握</p><strong id="stat-mastered">0</strong><span>道题</span></article>
+            <article class="metric-card mastery"><p>总掌握度</p><strong id="stat-mastery">0%</strong><div class="mini-progress"><span id="stat-mastery-bar"></span></div></article>
+          </div>
+
+          <div class="stats-grid">
+            <section class="stats-panel"><div class="panel-heading"><div><p class="section-label">分类掌握度</p><h2>知识结构</h2></div></div><div id="category-stats" class="distribution-list"></div></section>
+            <section class="stats-panel"><div class="panel-heading"><div><p class="section-label">薄弱主题</p><h2>优先补强</h2></div><span class="legend"><i></i>低于 50%</span></div><div id="topic-stats" class="topic-stat-list"></div></section>
+          </div>
+
+          <section class="history-section"><div class="panel-heading"><div><p class="section-label">REVIEW LOG</p><h2>近期复习</h2></div></div><div id="recent-reviews" class="history-list"></div></section>
+        </div>
+        <div id="stats-error" class="empty-state large" hidden><div class="empty-mark error">!</div><h2>统计加载失败</h2><p id="stats-error-message"></p><button class="button primary" id="retry-stats" type="button">重新加载</button></div>
+      </section>
+    </main>
+  </div>
+  <div id="toast-region" class="toast-region" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

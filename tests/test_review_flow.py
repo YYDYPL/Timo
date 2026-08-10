@@ -109,6 +109,19 @@ def test_stats_due_excludes_suspended(client, suspended_question):
     assert stats["today_due"] == 25
 
 
+def test_again_keeps_card_due_today(client):
+    created = client.post("/api/questions", json=_question_payload()).json()
+    qid = created["id"]
+    response = client.post(f"/api/review/{qid}", json={"quality": 1})
+    assert response.status_code == 200
+    assert response.json()["repeat_today"] is True
+    detail = client.get(f"/api/questions/{qid}").json()
+    # 重来 = 还没记住：仍归今天待复习，刷新后还在今日队列。
+    assert detail["review"]["due_date"] == date.today().isoformat()
+    today_queue = client.get("/api/review/today").json()
+    assert qid in [q["id"] for q in today_queue["items"]]
+
+
 def test_generate_answer_requires_question_text(client):
     response = client.post("/api/ai/generate-answer", json={"question": "  ", "keypoints": []})
     assert response.status_code == 422

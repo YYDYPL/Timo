@@ -414,7 +414,7 @@
   // Active recall review
 
   function initReviewPage() {
-    const state = { queue: [], current: null, attempts: 0, evaluation: null, aiConfigured: true, sourceTotal: 0, forcedId: null };
+    const state = { queue: [], current: null, evaluation: null, aiConfigured: true, sourceTotal: 0, forcedId: null };
     const rawId = new URLSearchParams(window.location.search).get("id");
     state.forcedId = rawId && Number.isInteger(Number(rawId)) && Number(rawId) > 0 ? Number(rawId) : null;
     const loading = $("#review-loading");
@@ -422,11 +422,14 @@
     const empty = $("#review-empty");
     const errorState = $("#review-error");
 
-    function updateProgress(done = false) {
+    function updateProgress() {
+      // 已完成 = 总题数 − 仍待处理的卡（队列 + 当前）。重来只是把卡放回
+      // 队尾，不改变总题数，也不算已完成；等它最终评过（良好/简单等）才推进。
       const remaining = state.queue.length + (state.current ? 1 : 0);
-      const total = state.attempts + remaining;
-      const percent = total ? (state.attempts / total) * 100 : (done && state.sourceTotal ? 100 : 0);
-      $("#review-progress-label").textContent = `${state.attempts} / ${total}`;
+      const total = state.sourceTotal;
+      const completed = Math.max(0, total - remaining);
+      const percent = total ? Math.min(100, (completed / total) * 100) : 0;
+      $("#review-progress-label").textContent = `${completed} / ${total}`;
       $("#review-progress-bar").style.width = `${percent}%`;
     }
 
@@ -441,7 +444,7 @@
         state.current = null;
         card.hidden = true;
         empty.hidden = false;
-        updateProgress(true);
+        updateProgress();
         $("#empty-today-link").hidden = !state.forcedId;
         if (state.forcedId) {
           $("#review-empty-title").textContent = "这道题复习完了";
@@ -484,7 +487,6 @@
       errorState.hidden = true;
       state.queue = [];
       state.current = null;
-      state.attempts = 0;
       try {
         if (state.forcedId) {
           // Single-question review: drill one card regardless of its due date.
@@ -582,9 +584,8 @@
         });
         if (quality === 1 || result.repeat_today) state.queue.push(reviewedCard);
         state.current = null;
-        state.attempts += 1;
         const interval = numberValue(result.review?.interval);
-        const message = quality === 1 ? "已放到本轮队列末尾" : interval ? `${interval} 天后再见` : "复习进度已记录";
+        const message = quality === 1 ? "已放回本轮队尾" : interval ? `${interval} 天后再见` : "复习进度已记录";
         toast(result.quality_label || "复习已记录", message);
         showNextQuestion();
         setDueBadge(state.queue.length + (state.current ? 1 : 0));

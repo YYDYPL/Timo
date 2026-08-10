@@ -364,6 +364,11 @@ def submit_review(question_id: int, payload: ReviewSubmit) -> dict[str, Any]:
         current_row = conn.execute("SELECT * FROM reviews WHERE question_id = ?", (question_id,)).fetchone()
         current = dict(current_row) if current_row is not None else {}
         next_state = schedule_review(current, payload.quality)
+        # A failed card (重来) has not been recalled: it stays due today so it
+        # remains in today's queue even after a refresh. schedule_review() stays
+        # pure (due_date = reviewed_on + interval); apply the product rule here.
+        if payload.quality < 3:
+            next_state["due_date"] = today_iso()
         conn.execute(
             """
             UPDATE reviews

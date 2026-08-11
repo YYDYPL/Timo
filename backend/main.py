@@ -32,6 +32,7 @@ try:
         LLMNotConfigured,
         evaluate_answer,
         generate_followup_questions,
+        generate_keypoints,
         generate_reference_answer,
         is_configured,
     )
@@ -40,6 +41,7 @@ try:
         FollowupQuestionOut,
         GenerateAnswerRequest,
         GenerateFollowupsRequest,
+        GenerateKeypointsRequest,
         ImportFollowupsRequest,
         ProjectCreate,
         ProjectUpdate,
@@ -69,6 +71,7 @@ except ImportError:  # Allows: uvicorn main:app from inside backend/
         LLMNotConfigured,
         evaluate_answer,
         generate_followup_questions,
+        generate_keypoints,
         generate_reference_answer,
         is_configured,
     )
@@ -77,6 +80,7 @@ except ImportError:  # Allows: uvicorn main:app from inside backend/
         FollowupQuestionOut,
         GenerateAnswerRequest,
         GenerateFollowupsRequest,
+        GenerateKeypointsRequest,
         ImportFollowupsRequest,
         ProjectCreate,
         ProjectUpdate,
@@ -581,6 +585,21 @@ def ai_generate_answer(payload: GenerateAnswerRequest) -> dict[str, Any]:
     except LLMError as exc:
         raise _llm_http_error(exc) from exc
     return {"answer": answer}
+
+
+@app.post("/api/ai/generate-keypoints")
+def ai_generate_keypoints(payload: GenerateKeypointsRequest) -> dict[str, Any]:
+    question = (payload.question or "").strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="请先填写题目内容")
+    answer = (payload.answer or "").strip()
+    if not answer:
+        raise HTTPException(status_code=422, detail="请先填写参考答案，AI 需要据此提炼要点")
+    try:
+        keypoints = generate_keypoints(question, answer)
+    except LLMError as exc:
+        raise _llm_http_error(exc) from exc
+    return {"keypoints": keypoints}
 
 
 # ---------------------------------------------------------------------------

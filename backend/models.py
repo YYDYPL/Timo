@@ -86,6 +86,11 @@ class GenerateAnswerRequest(BaseModel):
     keypoints: list[str] = Field(default_factory=list)
 
 
+class GenerateKeypointsRequest(BaseModel):
+    question: str
+    answer: str = ""
+
+
 class FollowupQuestionOut(BaseModel):
     question: str
     answer: str = ""
@@ -117,6 +122,7 @@ __all__ = [
     "FollowupQuestionOut",
     "GenerateAnswerRequest",
     "GenerateFollowupsRequest",
+    "GenerateKeypointsRequest",
     "ImportFollowupsRequest",
     "ProjectCreate",
     "ProjectOut",

@@ -125,3 +125,10 @@ def test_again_keeps_card_due_today(client):
 def test_generate_answer_requires_question_text(client):
     response = client.post("/api/ai/generate-answer", json={"question": "  ", "keypoints": []})
     assert response.status_code == 422
+
+
+def test_generate_keypoints_requires_question_and_answer(client):
+    no_question = client.post("/api/ai/generate-keypoints", json={"question": "  ", "answer": "答案"})
+    assert no_question.status_code == 422
+    no_answer = client.post("/api/ai/generate-keypoints", json={"question": "题目", "answer": "  "})
+    assert no_answer.status_code == 422

@@ -310,6 +310,8 @@
         state.questions = asList(payload).map(normalizeQuestion);
         $("#generate-answer").disabled = !aiConfigured;
         $("#generate-answer").title = aiConfigured ? "" : "请先在 .env 中配置 LLM";
+        $("#generate-keypoints").disabled = !aiConfigured;
+        $("#generate-keypoints").title = aiConfigured ? "" : "请先在 .env 中配置 LLM";
         refreshTopicOptions();
         renderQuestions();
       } catch (error) {
@@ -338,6 +340,34 @@
         });
         $("#question-answer").value = result.answer || "";
         toast("参考答案已生成", "已填入参考答案文本框，可继续编辑。");
+      } catch (error) {
+        toast(error.status === 503 ? "AI 尚未配置" : "生成失败", error.message, "error");
+      } finally {
+        setButtonBusy(button, false);
+      }
+    });
+
+    $("#generate-keypoints").addEventListener("click", async () => {
+      const questionText = $("#question-text").value.trim();
+      const answerText = $("#question-answer").value.trim();
+      if (!questionText) {
+        toast("先写题目", "AI 需要题目内容才能提炼要点。", "error");
+        return;
+      }
+      if (!answerText) {
+        toast("先写参考答案", "AI 需要参考答案才能提炼要点。", "error");
+        return;
+      }
+      const button = $("#generate-keypoints");
+      setButtonBusy(button, true, "生成中…");
+      try {
+        const result = await api("/api/ai/generate-keypoints", {
+          method: "POST",
+          body: { question: questionText, answer: answerText },
+        });
+        const keypoints = (result.keypoints || []).map((item) => String(item).trim()).filter(Boolean);
+        $("#question-keypoints").value = keypoints.join("\n");
+        toast("要点已生成", `已填入 ${keypoints.length} 条要点，可继续编辑。`);
       } catch (error) {
         toast(error.status === 503 ? "AI 尚未配置" : "生成失败", error.message, "error");
       } finally {

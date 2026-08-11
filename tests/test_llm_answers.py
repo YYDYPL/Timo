@@ -42,3 +42,30 @@ def test_generate_reference_answer_rejects_empty(monkeypatch):
     monkeypatch.setattr(llm, "_chat_json", lambda _system, _user: {})
     with pytest.raises(LLMError):
         llm.generate_reference_answer("问题", [])
+
+
+def test_generate_keypoints_returns_clean_list(monkeypatch):
+    monkeypatch.setattr(
+        llm,
+        "_chat_json",
+        lambda _system, _user: {"keypoints": ["1. 可重入", "- 异常自动释放", "2PC 两阶段提交"]},
+    )
+    keypoints = llm.generate_keypoints("问题", "答案")
+    assert keypoints == ["可重入", "异常自动释放", "2PC 两阶段提交"]
+
+
+def test_generate_keypoints_handles_string_and_alternative_keys(monkeypatch):
+    monkeypatch.setattr(llm, "_chat_json", lambda _system, _user: {"points": "要点A\n要点B"})
+    assert llm.generate_keypoints("问题", "答案") == ["要点A", "要点B"]
+
+
+def test_generate_keypoints_caps_at_seven(monkeypatch):
+    many = [f"要点{i}" for i in range(1, 10)]
+    monkeypatch.setattr(llm, "_chat_json", lambda _system, _user: {"keypoints": many})
+    assert len(llm.generate_keypoints("问题", "答案")) == 7
+
+
+def test_generate_keypoints_rejects_empty(monkeypatch):
+    monkeypatch.setattr(llm, "_chat_json", lambda _system, _user: {})
+    with pytest.raises(LLMError):
+        llm.generate_keypoints("问题", "答案")

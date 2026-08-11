@@ -211,6 +211,44 @@ def generate_reference_answer(question: str, keypoints: list[str]) -> str:
     return answer
 
 
+def generate_keypoints(question: str, answer: str) -> list[str]:
+    """Derive 3-7 concise answer keypoints from a question and its reference answer."""
+
+    system_prompt = (
+        "你是资深技术面试官。根据面试题和参考答案，提炼 3-7 条最核心、可用于给回答打分的要点。"
+        "每条要点要简短（一句话以内）、互相独立、不重复，尽量用名词短语而非长句。"
+        "只输出 JSON 对象，不要输出 JSON 之外的 Markdown。"
+    )
+    user_prompt = f"""
+面试题：{question}
+参考答案：{answer}
+
+返回：
+{{"keypoints":["要点1","要点2","要点3"]}}
+""".strip()
+    payload = _chat_json(system_prompt, user_prompt)
+    if not isinstance(payload, dict):
+        raise LLMError("LLM 要点结果格式不正确")
+
+    raw = payload.get("keypoints") or payload.get("points") or payload.get("items") or []
+    if isinstance(raw, str):
+        raw = re.split(r"[\n;；]", raw)
+
+    result: list[str] = []
+    for item in raw:
+        cleaned = str(item).strip()
+        # 去掉常见的编号/圆点前缀，但保留 "2PC"、"3NF" 这类以数字开头的术语。
+        cleaned = re.sub(r"^\s*[-*•・]\s*", "", cleaned)
+        cleaned = re.sub(r"^\d+[\.\)]\s+", "", cleaned)
+        cleaned = cleaned.strip()
+        if cleaned:
+            result.append(cleaned)
+
+    if not result:
+        raise LLMError("LLM 没有生成可用的要点")
+    return result[:7]
+
+
 def evaluate_answer(
     *,
     question: str,
@@ -267,6 +305,7 @@ __all__ = [
     "LLMNotConfigured",
     "evaluate_answer",
     "generate_followup_questions",
+    "generate_keypoints",
     "generate_reference_answer",
     "get_settings",
     "is_configured",

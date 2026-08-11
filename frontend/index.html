@@ -92,7 +92,15 @@
             <option value="项目">项目</option>
           </select>
         </label>
-        <label class="field"><span>主题</span><input id="question-topic" type="text" maxlength="80" placeholder="如 JVM、并发、RAG" required></label>
+        <label class="field"><span>主题</span>
+          <select id="question-topic" required>
+            <option value="" disabled selected>请选择主题</option>
+          </select>
+        </label>
+      </div>
+      <div class="field" id="custom-topic-field" hidden>
+        <span>自定义主题</span>
+        <input id="custom-topic-input" type="text" maxlength="80" placeholder="输入不在列表中的主题">
       </div>
       <label class="field"><span>题目</span><textarea id="question-text" rows="3" maxlength="2000" required></textarea></label>
       <label class="field"><span>参考答案</span><textarea id="question-answer" rows="6" maxlength="12000"></textarea></label>

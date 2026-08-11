@@ -195,8 +195,14 @@
   // -----------------------------------------------------------------------
   // Question bank
 
+  const PRESET_TOPICS = [
+    "java基础", "集合", "JVM", "JUC", "Spring", "MySQL",
+    "SpringBoot", "Redis", "计算机网络", "操作系统",
+    "AI Agent", "分布式", "消息队列",
+  ];
+
   function initQuestionsPage() {
-    const state = { questions: [] };
+    const state = { questions: [], projectNames: [] };
     const list = $("#question-list");
     const searchInput = $("#question-search");
     const categoryFilter = $("#category-filter");
@@ -211,6 +217,27 @@
         select.add(new Option(label, normalized));
       }
       select.value = normalized;
+    }
+
+    // 主题下拉框：预设主题 + 项目名 + 题库里已有的主题，去重、预设优先。
+    function topicOptionsList() {
+      const existing = [...new Set(state.questions.map((item) => item.topic).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, "zh-CN"));
+      const projects = [...new Set(state.projectNames)]
+        .sort((a, b) => a.localeCompare(b, "zh-CN"));
+      const seen = new Set();
+      const result = [];
+      for (const topic of [...PRESET_TOPICS, ...projects, ...existing]) {
+        if (!seen.has(topic)) { seen.add(topic); result.push(topic); }
+      }
+      return result;
+    }
+
+    function refreshTopicFormOptions() {
+      const select = $("#question-topic");
+      select.innerHTML = '<option value="" disabled selected>请选择主题</option>'
+        + topicOptionsList().map((topic) => `<option value="${escapeHtml(topic)}">${escapeHtml(topic)}</option>`).join("")
+        + '<option value="__custom__">＋ 自定义…</option>';
     }
 
     function refreshTopicOptions() {
@@ -293,7 +320,15 @@
       $("#question-id").value = question?.id || "";
       $("#question-dialog-title").textContent = question ? "编辑题目" : "新建题目";
       setSelectValue($("#question-category"), question?.category || "八股", categoryLabel(question?.category || "八股"));
-      $("#question-topic").value = question?.topic || "";
+      refreshTopicFormOptions();
+      const topic = question?.topic?.trim() || "";
+      const topicSelect = $("#question-topic");
+      if (topic && ![...topicSelect.options].some((option) => option.value === topic)) {
+        topicSelect.add(new Option(topic, topic));
+      }
+      topicSelect.value = topic;
+      $("#custom-topic-field").hidden = true;
+      $("#custom-topic-input").value = "";
       $("#question-text").value = question?.question || "";
       $("#question-answer").value = question?.answer || "";
       $("#question-keypoints").value = normalizeStringList(question?.keypoints).join("\n");
@@ -306,8 +341,15 @@
 
     async function loadQuestions() {
       try {
-        const [payload, aiConfigured] = await Promise.all([api("/api/questions"), updateAiStatus()]);
+        const [payload, projects, aiConfigured] = await Promise.all([
+          api("/api/questions"),
+          api("/api/projects"),
+          updateAiStatus(),
+        ]);
         state.questions = asList(payload).map(normalizeQuestion);
+        state.projectNames = asList(projects)
+          .map((project) => String(project.name || "").trim())
+          .filter(Boolean);
         $("#generate-answer").disabled = !aiConfigured;
         $("#generate-answer").title = aiConfigured ? "" : "请先在 .env 中配置 LLM";
         $("#generate-keypoints").disabled = !aiConfigured;
@@ -374,6 +416,11 @@
         setButtonBusy(button, false);
       }
     });
+    $("#question-topic").addEventListener("change", () => {
+      const custom = $("#question-topic").value === "__custom__";
+      $("#custom-topic-field").hidden = !custom;
+      if (custom) window.setTimeout(() => $("#custom-topic-input").focus(), 0);
+    });
     [searchInput, categoryFilter, topicFilter].forEach((control) => control.addEventListener(control === searchInput ? "input" : "change", () => {
       if (control === categoryFilter) refreshTopicOptions();
       renderQuestions();
@@ -428,9 +475,16 @@
       event.preventDefault();
       const id = $("#question-id").value;
       const saveButton = $("#save-question");
+      const topicSelect = $("#question-topic");
+      const isCustomTopic = topicSelect.value === "__custom__";
+      const topic = isCustomTopic ? $("#custom-topic-input").value.trim() : topicSelect.value.trim();
+      if (!topic) {
+        toast("请选择或填写主题", "主题不能为空。", "error");
+        return;
+      }
       const payload = {
         category: $("#question-category").value,
-        topic: $("#question-topic").value.trim(),
+        topic,
         question: $("#question-text").value.trim(),
         answer: $("#question-answer").value.trim(),
         keypoints: $("#question-keypoints").value.split(/\r?\n/).map((point) => point.replace(/^[-*•]\s*/, "").trim()).filter(Boolean),

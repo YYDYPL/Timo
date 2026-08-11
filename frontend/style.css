@@ -19,6 +19,7 @@
   --blue-soft: #edf3fa;
   --danger: #b94747;
   --danger-soft: #faecec;
+  --code-bg: #f0f3f2;
   --shadow: 0 12px 32px rgba(24, 33, 31, 0.08);
   --sidebar-width: 226px;
 }
@@ -323,7 +324,7 @@ input::placeholder, textarea::placeholder { color: #9aa39f; }
 .question-detail { padding: 0 18px 19px; background: #fbfcfb; }
 .question-detail-inner { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(220px, .65fr); gap: 26px; padding: 18px; border-left: 3px solid #bad3cb; background: var(--surface); }
 .question-detail h3 { margin-bottom: 7px; color: var(--muted); font-size: 12px; }
-.answer-preview { margin: 0; color: var(--text-soft); line-height: 1.75; white-space: pre-wrap; }
+.answer-preview { margin: 0; color: var(--text-soft); line-height: 1.75; }
 .keypoint-preview { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .keypoint-preview li { position: relative; padding-left: 16px; color: var(--text-soft); }
 .keypoint-preview li::before { content: ""; position: absolute; left: 0; top: .68em; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
@@ -396,7 +397,32 @@ input::placeholder, textarea::placeholder { color: #9aa39f; }
 .recall-actions { display: flex; justify-content: space-between; gap: 10px; }
 .answer-panel { background: #fbfcfb; }
 .answer-section + .answer-section { margin-top: 23px; }
-.answer-copy { color: var(--text-soft); line-height: 1.82; white-space: pre-wrap; }
+.answer-copy { color: var(--text-soft); line-height: 1.82; }
+
+/* Markdown-rendered content (answers, keypoints, AI follow-ups). */
+.markdown { overflow-wrap: break-word; }
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown h1, .markdown h2, .markdown h3, .markdown h4, .markdown h5, .markdown h6 { margin: 1.05em 0 .5em; line-height: 1.3; font-weight: 800; }
+.markdown h1 { font-size: 1.35em; }
+.markdown h2 { font-size: 1.22em; }
+.markdown h3 { font-size: 1.1em; }
+.markdown h4 { font-size: 1em; }
+.markdown h5, .markdown h6 { font-size: .95em; }
+.markdown p { margin: .6em 0; }
+.markdown ul, .markdown ol { margin: .6em 0; padding-left: 1.45em; }
+.markdown li { margin: .28em 0; }
+.markdown ul ul, .markdown ol ol, .markdown ul ol, .markdown ol ul { margin: .2em 0; }
+.markdown blockquote { margin: .8em 0; padding: .15em 0 .15em 1em; border-left: 3px solid var(--line-strong); color: var(--muted); }
+.markdown code { padding: .12em .38em; border-radius: 4px; background: var(--code-bg); font-family: ui-monospace, Consolas, "Courier New", monospace; font-size: .88em; }
+.markdown pre { margin: .8em 0; padding: .8em 1em; overflow-x: auto; border-radius: 8px; background: var(--code-bg); line-height: 1.5; }
+.markdown pre code { padding: 0; background: none; font-size: .88em; }
+.markdown table { width: 100%; margin: .8em 0; border-collapse: collapse; font-size: .92em; }
+.markdown th, .markdown td { padding: 6px 10px; border: 1px solid var(--line-strong); text-align: left; }
+.markdown th { background: var(--surface-soft); font-weight: 800; }
+.markdown hr { margin: 1em 0; border: 0; border-top: 1px solid var(--line-strong); }
+.markdown a { color: var(--brand); text-decoration: underline; }
+.markdown img { max-width: 100%; }
 .keypoint-list { display: grid; gap: 9px; margin: 0; padding: 0; counter-reset: point; list-style: none; }
 .keypoint-list li { position: relative; min-height: 31px; padding: 4px 0 4px 40px; color: var(--text-soft); counter-increment: point; }
 .keypoint-list li::before { content: counter(point); position: absolute; left: 0; top: 0; display: grid; width: 29px; height: 29px; place-items: center; border-radius: 50%; background: var(--brand-soft); color: var(--brand-dark); font-size: 12px; font-weight: 800; }

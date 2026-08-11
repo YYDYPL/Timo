@@ -143,7 +143,8 @@ def generate_followup_questions(project: dict[str, Any], count: int = 6) -> list
     system_prompt = (
         "你是资深技术面试官。根据候选人的真实项目生成有区分度的追问，覆盖架构取舍、"
         "实现细节、故障排查、性能、数据一致性和复盘。每道题都要附一段简洁完整的中文参考答案"
-        "（200-400 字，可被直接念出来）和 3-7 个要点。只输出 JSON 对象，不要 Markdown。"
+        "（200-400 字，可被直接念出来）和 3-7 个要点。参考答案正文可适当使用 Markdown 排版"
+        "（加粗、列表、行内代码、代码块）。只输出 JSON 对象，不要输出 JSON 之外的 Markdown。"
     )
     user_prompt = f"""
 项目名称：{project.get('name', '')}
@@ -191,7 +192,8 @@ def generate_reference_answer(question: str, keypoints: list[str]) -> str:
 
     system_prompt = (
         "你是资深技术面试官。根据题目和给出的要点，撰写一段简明完整、条理清晰的中文参考答案"
-        "（200-500 字），覆盖全部要点。只输出 JSON 对象，不要 Markdown。"
+        "（200-500 字），覆盖全部要点。参考答案正文可适当使用 Markdown 排版"
+        "（加粗、列表、行内代码、代码块）。只输出 JSON 对象，不要输出 JSON 之外的 Markdown。"
     )
     user_prompt = f"""
 面试题：{question}

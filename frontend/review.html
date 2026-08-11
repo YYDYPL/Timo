@@ -42,7 +42,7 @@
             <span id="review-topic" class="topic-label"></span>
             <span id="review-position" class="muted-label"></span>
           </div>
-          <h2 id="review-question"></h2>
+          <h2 id="review-question" class="markdown"></h2>
 
           <div id="recall-panel" class="recall-panel">
             <label class="field answer-draft"><span>我的回答</span><textarea id="recall-answer" rows="6" placeholder="先写下或口述你能想到的要点…"></textarea></label>
@@ -55,7 +55,7 @@
           <div id="answer-panel" class="answer-panel" hidden>
             <div class="answer-section">
               <p class="section-label">参考答案</p>
-              <div id="review-answer" class="answer-copy"></div>
+              <div id="review-answer" class="answer-copy markdown"></div>
             </div>
             <div class="answer-section">
               <p class="section-label">关键要点</p>
@@ -96,6 +96,8 @@
     </main>
   </div>
   <div id="toast-region" class="toast-region" aria-live="polite"></div>
+  <script src="/vendor/markdown-it.min.js" defer></script>
+  <script src="/markdown.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>

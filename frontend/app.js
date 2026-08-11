@@ -52,6 +52,21 @@
     })[char]);
   }
 
+  function renderMarkdown(value) {
+    // markdown.js 未加载时退化为纯文本转义，保证只读展示仍安全。
+    if (window.MarkdownRenderer && typeof window.MarkdownRenderer.render === "function") {
+      return window.MarkdownRenderer.render(value);
+    }
+    return escapeHtml(value);
+  }
+
+  function renderInlineMarkdown(value) {
+    if (window.MarkdownRenderer && typeof window.MarkdownRenderer.renderInline === "function") {
+      return window.MarkdownRenderer.renderInline(value);
+    }
+    return escapeHtml(value);
+  }
+
   function asList(payload, keys = ["items"]) {
     if (Array.isArray(payload)) return payload;
     for (const key of keys) {
@@ -247,7 +262,7 @@
           <article class="question-item" data-question-id="${item.id}">
             <div class="question-main-row">
               <div class="question-title">
-                <strong>${escapeHtml(item.question)}</strong>
+                <strong>${renderInlineMarkdown(item.question)}</strong>
                 <div class="question-title-meta">
                   <span class="category-badge ${categoryClass(item.category)}">${escapeHtml(categoryLabel(item.category))}</span>
                   ${suspended ? '<span class="muted-label">待安排</span>' : ""}
@@ -265,8 +280,8 @@
             </div>
             <div class="question-detail" id="${detailId}" hidden>
               <div class="question-detail-inner">
-                <div><h3>参考答案</h3><p class="answer-preview">${escapeHtml(item.answer || "暂无参考答案")}</p>${item.source ? `<p class="source-line">来源：${escapeHtml(item.source)}</p>` : ""}</div>
-                <div><h3>关键要点</h3>${keypoints.length ? `<ul class="keypoint-preview">${keypoints.map((point) => `<li>${escapeHtml(point)}</li>`).join("")}</ul>` : '<p class="answer-preview">暂无要点</p>'}</div>
+                <div><h3>参考答案</h3><div class="answer-preview markdown">${renderMarkdown(item.answer) || '<p class="muted">暂无参考答案</p>'}</div>${item.source ? `<p class="source-line">来源：${escapeHtml(item.source)}</p>` : ""}</div>
+                <div><h3>关键要点</h3>${keypoints.length ? `<ul class="keypoint-preview">${keypoints.map((point) => `<li class="markdown">${renderMarkdown(point)}</li>`).join("")}</ul>` : '<p class="answer-preview">暂无要点</p>'}</div>
               </div>
             </div>
           </article>`;
@@ -465,11 +480,11 @@
       category.className = `category-badge ${categoryClass(question.category)}`;
       $("#review-topic").textContent = question.topic || "未分类";
       $("#review-position").textContent = `${state.queue.length + 1} 张待处理`;
-      $("#review-question").textContent = question.question;
-      $("#review-answer").textContent = question.answer || "暂无参考答案，请以关键要点为准。";
+      $("#review-question").innerHTML = renderInlineMarkdown(question.question);
+      $("#review-answer").innerHTML = renderMarkdown(question.answer) || '<p class="muted">暂无参考答案，请以关键要点为准。</p>';
       const keypoints = normalizeStringList(question.keypoints);
       $("#review-keypoints").innerHTML = keypoints.length
-        ? keypoints.map((point) => `<li>${escapeHtml(point)}</li>`).join("")
+        ? keypoints.map((point) => `<li class="markdown">${renderMarkdown(point)}</li>`).join("")
         : "<li>暂无关键要点</li>";
       $("#evaluate-answer").disabled = !state.aiConfigured;
       $("#evaluate-answer").title = state.aiConfigured ? "" : "请先在 .env 中配置 LLM";
@@ -674,7 +689,7 @@
             <span class="followup-check"><input class="followup-select" type="checkbox" value="${index}" checked></span>
             <span>
               <h3>${escapeHtml(item.question)}</h3>
-              ${item.answer ? `<p class="followup-answer">${escapeHtml(item.answer)}</p>` : ""}
+              ${item.answer ? `<div class="followup-answer markdown">${renderMarkdown(item.answer)}</div>` : ""}
               <span class="followup-keypoints">${points.map((point) => `<span>${escapeHtml(point)}</span>`).join("")}</span>
             </span>
           </label>`;

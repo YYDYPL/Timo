@@ -11,6 +11,11 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+try:
+    from .db import get_active_llm_config
+except ImportError:  # Allows running from backend/ directly (uvicorn main:app)
+    from db import get_active_llm_config  # type: ignore
+
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT_DIR / ".env")
@@ -25,10 +30,27 @@ class LLMNotConfigured(LLMError):
 
 
 def get_settings() -> dict[str, str]:
+    """Return the active LLM connection settings.
+
+    A saved config activated from the settings page takes precedence; when none
+    is active the app falls back to the .env values.
+    """
+
+    active = get_active_llm_config()
+    if active:
+        return {
+            "api_key": str(active.get("api_key") or "").strip(),
+            "base_url": str(active.get("base_url") or "").strip(),
+            "model": str(active.get("model") or "").strip(),
+            "timeout": str(active.get("timeout") or 60),
+            "source": "saved",
+        }
     return {
         "api_key": os.getenv("LLM_API_KEY", "").strip(),
         "base_url": os.getenv("LLM_BASE_URL", "").strip(),
         "model": os.getenv("LLM_MODEL", "").strip(),
+        "timeout": os.getenv("LLM_TIMEOUT", "60"),
+        "source": "env",
     }
 
 
@@ -39,7 +61,7 @@ def is_configured() -> bool:
 
 
 @lru_cache(maxsize=8)
-def _client(api_key: str, base_url: str):
+def _client(api_key: str, base_url: str, timeout: float):
     try:
         from openai import OpenAI
     except ImportError as exc:
@@ -47,7 +69,7 @@ def _client(api_key: str, base_url: str):
 
     kwargs: dict[str, Any] = {
         "api_key": api_key or "not-needed",
-        "timeout": float(os.getenv("LLM_TIMEOUT", "60")),
+        "timeout": timeout,
     }
     if base_url:
         kwargs["base_url"] = base_url
@@ -102,7 +124,7 @@ def _chat_json(system_prompt: str, user_prompt: str) -> Any:
     if not is_configured():
         raise LLMNotConfigured("LLM 未配置，请在 .env 中设置 LLM_BASE_URL、LLM_API_KEY 和 LLM_MODEL")
 
-    client = _client(settings["api_key"], settings["base_url"])
+    client = _client(settings["api_key"], settings["base_url"], float(settings.get("timeout") or 60))
     request: dict[str, Any] = {
         "model": settings["model"],
         "messages": [

@@ -116,11 +116,23 @@ def init_db() -> None:
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS llm_configs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                base_url TEXT NOT NULL DEFAULT '',
+                api_key TEXT NOT NULL DEFAULT '',
+                model TEXT NOT NULL DEFAULT '',
+                timeout INTEGER NOT NULL DEFAULT 60,
+                is_active INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_questions_category ON questions(category);
             CREATE INDEX IF NOT EXISTS idx_questions_topic ON questions(topic);
             CREATE INDEX IF NOT EXISTS idx_reviews_due_date ON reviews(due_date);
             CREATE INDEX IF NOT EXISTS idx_review_logs_question ON review_logs(question_id);
             CREATE INDEX IF NOT EXISTS idx_review_logs_reviewed_at ON review_logs(reviewed_at);
+            CREATE INDEX IF NOT EXISTS idx_llm_configs_active ON llm_configs(is_active);
             """
         )
         _migrate(conn)
@@ -155,6 +167,85 @@ def row_to_review(row: sqlite3.Row | None) -> dict[str, Any] | None:
         return None
     item = dict(row)
     return item
+
+
+def row_to_llm_config(row: sqlite3.Row | None) -> dict[str, Any] | None:
+    if row is None:
+        return None
+    return dict(row)
+
+
+def list_llm_configs() -> list[dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM llm_configs ORDER BY created_at ASC, id ASC").fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_llm_config(config_id: int) -> dict[str, Any] | None:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM llm_configs WHERE id = ?", (config_id,)).fetchone()
+    return row_to_llm_config(row)
+
+
+def get_active_llm_config() -> dict[str, Any] | None:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM llm_configs WHERE is_active = 1 ORDER BY id LIMIT 1").fetchone()
+    return row_to_llm_config(row)
+
+
+def create_llm_config(
+    *,
+    name: str,
+    base_url: str = "",
+    api_key: str = "",
+    model: str = "",
+    timeout: int = 60,
+    active: bool = False,
+) -> dict[str, Any]:
+    now = local_now()
+    with get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO llm_configs(name, base_url, api_key, model, timeout, is_active, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (name, base_url, api_key, model, timeout, int(bool(active)), now),
+        )
+        config_id = int(cur.lastrowid)
+        if active:
+            conn.execute("UPDATE llm_configs SET is_active = 0 WHERE id <> ?", (config_id,))
+        return row_to_llm_config(conn.execute("SELECT * FROM llm_configs WHERE id = ?", (config_id,)).fetchone()) or {}
+
+
+def update_llm_config(config_id: int, values: dict[str, Any]) -> dict[str, Any] | None:
+    """Update a config. ``values`` may include name/base_url/api_key/model/timeout/active."""
+    with get_db() as conn:
+        if "active" in values:
+            if values["active"]:
+                conn.execute("UPDATE llm_configs SET is_active = 0 WHERE id <> ?", (config_id,))
+            values["is_active"] = int(bool(values["active"]))
+            del values["active"]
+        if values:
+            assignments = ", ".join(f"{field} = ?" for field in values)
+            conn.execute(f"UPDATE llm_configs SET {assignments} WHERE id = ?", [*values.values(), config_id])
+        row = conn.execute("SELECT * FROM llm_configs WHERE id = ?", (config_id,)).fetchone()
+    return row_to_llm_config(row)
+
+
+def set_active_llm_config(config_id: int) -> bool:
+    with get_db() as conn:
+        conn.execute("UPDATE llm_configs SET is_active = 0")
+        cur = conn.execute("UPDATE llm_configs SET is_active = 1 WHERE id = ?", (config_id,))
+        return cur.rowcount > 0
+
+
+def deactivate_all_llm_configs() -> None:
+    with get_db() as conn:
+        conn.execute("UPDATE llm_configs SET is_active = 0")
+
+
+def delete_llm_config(config_id: int) -> bool:
+    with get_db() as conn:
+        cur = conn.execute("DELETE FROM llm_configs WHERE id = ?", (config_id,))
+        return cur.rowcount > 0
 
 
 def ensure_review(conn: sqlite3.Connection, question_id: int, due_date: str | None = None, suspended: bool = False) -> None:
@@ -200,15 +291,25 @@ def count_questions() -> int:
 
 __all__ = [
     "DB_PATH",
+    "count_questions",
+    "create_llm_config",
+    "deactivate_all_llm_configs",
+    "delete_llm_config",
     "dumps",
     "ensure_review",
+    "get_active_llm_config",
     "get_db",
+    "get_llm_config",
     "init_db",
     "insert_question",
+    "list_llm_configs",
     "loads",
     "local_now",
+    "row_to_llm_config",
     "row_to_project",
     "row_to_question",
     "row_to_review",
+    "set_active_llm_config",
     "today_iso",
+    "update_llm_config",
 ]

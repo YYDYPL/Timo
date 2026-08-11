@@ -180,7 +180,11 @@
     try {
       const status = await api("/api/ai/status");
       const label = $(".sidebar-status span:last-child");
-      if (label) label.textContent = status.configured ? "本地数据 · AI 可用" : "本地数据 · AI 未配置";
+      if (label) {
+        label.textContent = status.configured
+          ? (status.active_name ? `本地数据 · ${status.active_name}` : "本地数据 · AI 可用")
+          : "本地数据 · AI 未配置";
+      }
       return status.configured !== false;
     } catch {
       return true;
@@ -190,6 +194,7 @@
   function initCommon() {
     $(`[data-nav="${page}"]`)?.classList.add("active");
     loadNavSnapshot();
+    updateAiStatus();
   }
 
   // -----------------------------------------------------------------------
@@ -954,9 +959,172 @@
     loadStats();
   }
 
+  // -----------------------------------------------------------------------
+  // LLM source settings
+
+  function initSettingsPage() {
+    const state = { configs: [], activeId: null, source: "env" };
+    const list = $("#config-list");
+    const dialog = $("#config-dialog");
+    const form = $("#config-form");
+
+    function activeConfig() {
+      return state.configs.find((item) => Number(item.id) === Number(state.activeId)) || null;
+    }
+
+    function renderSourceBanner() {
+      const banner = $("#config-source");
+      const active = activeConfig();
+      if (active) {
+        banner.innerHTML = `<span class="source-banner-label">当前来源：<strong>${escapeHtml(active.name)}</strong></span><button class="button ghost small" id="use-env-config" type="button">改用 .env 配置</button>`;
+      } else {
+        banner.innerHTML = `<span class="source-banner-label">当前来源：<strong>.env 配置</strong></span><span class="muted-label">（未激活任何已保存来源）</span>`;
+      }
+      const useEnv = $("#use-env-config");
+      if (useEnv) {
+        useEnv.addEventListener("click", async () => {
+          try {
+            await api("/api/llm/activate-env", { method: "POST" });
+            toast("已切换到 .env 配置");
+            await loadConfigs();
+          } catch (error) {
+            toast("切换失败", error.message, "error");
+          }
+        });
+      }
+    }
+
+    function renderConfigs() {
+      if (!state.configs.length) {
+        list.innerHTML = '<div class="empty-state large"><div class="empty-mark">＋</div><h2>还没有配置任何来源</h2><p>点击「添加来源」填入 Base URL、API Key 和模型，即可让 AI 功能跑起来。</p></div>';
+        return;
+      }
+      list.innerHTML = state.configs.map((config) => {
+        const isActive = Number(config.id) === Number(state.activeId);
+        return `
+          <article class="project-card config-card" data-config-id="${config.id}">
+            <div class="project-card-head">
+              <h2>${escapeHtml(config.name)}</h2>
+              <div class="project-menu">
+                ${isActive ? '<span class="quality-label">当前使用</span>' : `<button class="button secondary small activate-config" type="button">启用</button>`}
+                <button class="button ghost small edit-config" type="button">编辑</button>
+                <button class="icon-button delete-config" type="button" aria-label="删除配置" title="删除">×</button>
+              </div>
+            </div>
+            <div class="config-detail">
+              <p>Base URL：${escapeHtml(config.base_url || "（未填写）")}</p>
+              <p>模型：${escapeHtml(config.model || "（未填写）")}</p>
+              <p>API Key：${config.has_api_key ? escapeHtml(config.api_key_masked) : '<span class="muted-label">（未设置）</span>'}</p>
+              <p>超时：${numberValue(config.timeout, 60)} 秒</p>
+            </div>
+          </article>`;
+      }).join("");
+    }
+
+    function openConfigForm(config = null) {
+      form.reset();
+      $("#config-id").value = config?.id || "";
+      $("#config-dialog-title").textContent = config ? "编辑来源" : "添加来源";
+      $("#config-name").value = config?.name || "";
+      $("#config-base-url").value = config?.base_url || "";
+      $("#config-api-key").value = ""; // 编辑时留空 = 保留原 Key
+      $("#config-model").value = config?.model || "";
+      $("#config-timeout").value = String(config?.timeout || 60);
+      $("#config-active").checked = Boolean(config) && Number(config.id) === Number(state.activeId);
+      openDialog(dialog);
+      window.setTimeout(() => $("#config-name").focus(), 30);
+    }
+
+    async function loadConfigs() {
+      try {
+        const data = await api("/api/llm/configs");
+        state.configs = data.configs || [];
+        state.activeId = data.active_id;
+        state.source = data.source;
+        renderSourceBanner();
+        renderConfigs();
+        updateAiStatus();
+      } catch (error) {
+        list.innerHTML = `<div class="empty-state large"><div class="empty-mark error">!</div><h2>配置加载失败</h2><p>${escapeHtml(error.message)}</p><button class="button primary" type="button" data-action="retry-configs">重新加载</button></div>`;
+      }
+    }
+
+    $("#new-config").addEventListener("click", () => openConfigForm());
+    $$(".close-config-dialog").forEach((button) => button.addEventListener("click", () => closeDialog(dialog)));
+
+    list.addEventListener("click", async (event) => {
+      const action = event.target.closest("button");
+      if (!action) return;
+      if (action.dataset.action === "retry-configs") return loadConfigs();
+      const id = Number(action.closest("[data-config-id]")?.dataset.configId);
+      const config = state.configs.find((item) => Number(item.id) === id);
+      if (!config) return;
+      if (action.classList.contains("edit-config")) openConfigForm(config);
+      if (action.classList.contains("activate-config")) {
+        action.disabled = true;
+        try {
+          await api(`/api/llm/configs/${id}/activate`, { method: "POST" });
+          toast("已启用", `${config.name} 现在是当前来源。`);
+          await loadConfigs();
+          updateAiStatus();
+        } catch (error) {
+          action.disabled = false;
+          toast("启用失败", error.message, "error");
+        }
+      }
+      if (action.classList.contains("delete-config")) {
+        if (!window.confirm(`确定删除来源“${config.name}”吗？`)) return;
+        action.disabled = true;
+        try {
+          await api(`/api/llm/configs/${id}`, { method: "DELETE" });
+          toast("配置已删除");
+          await loadConfigs();
+          updateAiStatus();
+        } catch (error) {
+          action.disabled = false;
+          toast("删除失败", error.message, "error");
+        }
+      }
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const id = $("#config-id").value;
+      const saveButton = $("#save-config");
+      const name = $("#config-name").value.trim();
+      if (!name) {
+        toast("请填写名称", "配置名称不能为空。", "error");
+        return;
+      }
+      const payload = {
+        name,
+        base_url: $("#config-base-url").value.trim(),
+        api_key: $("#config-api-key").value.trim(),
+        model: $("#config-model").value.trim(),
+        timeout: Number($("#config-timeout").value) || 60,
+        active: $("#config-active").checked,
+      };
+      setButtonBusy(saveButton, true, "保存中…");
+      try {
+        await api(id ? `/api/llm/configs/${id}` : "/api/llm/configs", { method: id ? "PUT" : "POST", body: payload });
+        closeDialog(dialog);
+        toast(id ? "配置已更新" : "配置已添加");
+        await loadConfigs();
+        updateAiStatus();
+      } catch (error) {
+        toast("保存失败", error.message, "error");
+      } finally {
+        setButtonBusy(saveButton, false);
+      }
+    });
+
+    loadConfigs();
+  }
+
   initCommon();
   if (page === "questions") initQuestionsPage();
   if (page === "review") initReviewPage();
   if (page === "projects") initProjectsPage();
   if (page === "stats") initStatsPage();
+  if (page === "settings") initSettingsPage();
 })();

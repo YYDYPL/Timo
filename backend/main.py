@@ -16,16 +16,24 @@ try:
     from .db import (
         DB_PATH,
         count_questions,
+        create_llm_config,
+        deactivate_all_llm_configs,
+        delete_llm_config,
         dumps,
         ensure_review,
+        get_active_llm_config,
         get_db,
+        get_llm_config,
         init_db,
         insert_question,
+        list_llm_configs,
         loads,
         local_now,
         row_to_project,
         row_to_question,
+        set_active_llm_config,
         today_iso,
+        update_llm_config,
     )
     from .llm import (
         LLMError,
@@ -43,6 +51,8 @@ try:
         GenerateFollowupsRequest,
         GenerateKeypointsRequest,
         ImportFollowupsRequest,
+        LLMConfigCreate,
+        LLMConfigUpdate,
         ProjectCreate,
         ProjectUpdate,
         QuestionCreate,
@@ -55,16 +65,24 @@ except ImportError:  # Allows: uvicorn main:app from inside backend/
     from db import (  # type: ignore
         DB_PATH,
         count_questions,
+        create_llm_config,
+        deactivate_all_llm_configs,
+        delete_llm_config,
         dumps,
         ensure_review,
+        get_active_llm_config,
         get_db,
+        get_llm_config,
         init_db,
         insert_question,
+        list_llm_configs,
         loads,
         local_now,
         row_to_project,
         row_to_question,
+        set_active_llm_config,
         today_iso,
+        update_llm_config,
     )
     from llm import (  # type: ignore
         LLMError,
@@ -82,6 +100,8 @@ except ImportError:  # Allows: uvicorn main:app from inside backend/
         GenerateFollowupsRequest,
         GenerateKeypointsRequest,
         ImportFollowupsRequest,
+        LLMConfigCreate,
+        LLMConfigUpdate,
         ProjectCreate,
         ProjectUpdate,
         QuestionCreate,
@@ -570,8 +590,13 @@ def ai_evaluate(payload: EvaluateAnswerRequest) -> dict[str, Any]:
 
 
 @app.get("/api/ai/status")
-def ai_status() -> dict[str, bool]:
-    return {"configured": is_configured()}
+def ai_status() -> dict[str, Any]:
+    active = get_active_llm_config()
+    return {
+        "configured": is_configured(),
+        "source": "saved" if active else "env",
+        "active_name": active["name"] if active else None,
+    }
 
 
 @app.post("/api/ai/generate-answer")
@@ -600,6 +625,112 @@ def ai_generate_keypoints(payload: GenerateKeypointsRequest) -> dict[str, Any]:
     except LLMError as exc:
         raise _llm_http_error(exc) from exc
     return {"keypoints": keypoints}
+
+
+# ---------------------------------------------------------------------------
+# LLM source configuration (settings page)
+
+
+def _mask_key(key: str) -> str:
+    key = (key or "").strip()
+    if not key:
+        return ""
+    if len(key) <= 8:
+        return "*" * len(key)
+    return f"{key[:3]}****{key[-4:]}"
+
+
+def _mask_config(config: dict[str, Any]) -> dict[str, Any]:
+    item = dict(config)
+    key = item.pop("api_key", "") or ""
+    item["api_key_masked"] = _mask_key(key)
+    item["has_api_key"] = bool(key)
+    return item
+
+
+def _require_llm_config(config_id: int) -> dict[str, Any]:
+    config = get_llm_config(config_id)
+    if not config:
+        raise HTTPException(status_code=404, detail="配置不存在")
+    return config
+
+
+@app.get("/api/llm/configs")
+def list_llm_configs_endpoint() -> dict[str, Any]:
+    active = get_active_llm_config()
+    return {
+        "configs": [_mask_config(config) for config in list_llm_configs()],
+        "active_id": active["id"] if active else None,
+        "source": "saved" if active else "env",
+        "is_configured": is_configured(),
+    }
+
+
+@app.post("/api/llm/configs", status_code=status.HTTP_201_CREATED)
+def create_llm_config_endpoint(payload: LLMConfigCreate) -> dict[str, Any]:
+    name = (payload.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="配置名称不能为空")
+    values = _model_dict(payload)
+    # 第一条配置自动设为当前使用。
+    first = not list_llm_configs()
+    created = create_llm_config(
+        name=name,
+        base_url=(values.get("base_url") or "").strip(),
+        api_key=(values.get("api_key") or "").strip(),
+        model=(values.get("model") or "").strip(),
+        timeout=int(values.get("timeout") or 60),
+        active=bool(values.get("active")) or first,
+    )
+    return _mask_config(created)
+
+
+@app.put("/api/llm/configs/{config_id}")
+@app.patch("/api/llm/configs/{config_id}")
+def update_llm_config_endpoint(config_id: int, payload: LLMConfigUpdate) -> dict[str, Any]:
+    _require_llm_config(config_id)
+    raw = _model_dict(payload, exclude_unset=True)
+    if not raw:
+        return _mask_config(_require_llm_config(config_id))
+    values: dict[str, Any] = {}
+    if "name" in raw:
+        name = (raw["name"] or "").strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="配置名称不能为空")
+        values["name"] = name
+    if "base_url" in raw:
+        values["base_url"] = (raw["base_url"] or "").strip()
+    if "model" in raw:
+        values["model"] = (raw["model"] or "").strip()
+    # 编辑时 API Key 留空表示保留原值，避免误清空。
+    if "api_key" in raw and (raw["api_key"] or "").strip():
+        values["api_key"] = (raw["api_key"] or "").strip()
+    if raw.get("timeout") is not None:
+        values["timeout"] = int(raw["timeout"])
+    if "active" in raw:
+        values["active"] = bool(raw["active"])
+    updated = update_llm_config(config_id, values)
+    return _mask_config(updated or {})
+
+
+@app.post("/api/llm/configs/{config_id}/activate")
+def activate_llm_config_endpoint(config_id: int) -> dict[str, Any]:
+    _require_llm_config(config_id)
+    set_active_llm_config(config_id)
+    return {"active_id": config_id, "source": "saved", "is_configured": is_configured()}
+
+
+@app.post("/api/llm/activate-env")
+def activate_env_config_endpoint() -> dict[str, Any]:
+    deactivate_all_llm_configs()
+    return {"active_id": None, "source": "env", "is_configured": is_configured()}
+
+
+@app.delete("/api/llm/configs/{config_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_llm_config_endpoint(config_id: int) -> Response:
+    if not delete_llm_config(config_id):
+        raise HTTPException(status_code=404, detail="配置不存在")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ---------------------------------------------------------------------------

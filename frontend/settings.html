@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#196f5a">
+  <title>AI 设置 · Timo 面试背题</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+</head>
+<body data-page="settings">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Timo 首页">
+        <span class="brand-mark">T</span>
+        <span><strong>Timo</strong><small>面试背题</small></span>
+      </a>
+      <nav class="primary-nav" aria-label="主导航">
+        <a href="/" data-nav="questions"><span class="nav-mark">题</span><span>题库</span></a>
+        <a href="/review.html" data-nav="review"><span class="nav-mark">复</span><span>今日复习</span><span class="nav-count" data-due-count hidden></span></a>
+        <a href="/project.html" data-nav="projects"><span class="nav-mark">项</span><span>项目库</span></a>
+        <a href="/stats.html" data-nav="stats"><span class="nav-mark">统</span><span>统计</span></a>
+        <a href="/settings.html" data-nav="settings"><span class="nav-mark">AI</span><span>设置</span></a>
+      </nav>
+      <div class="sidebar-status"><span class="status-dot"></span><span>本地数据</span></div>
+    </aside>
+
+    <main class="main-content">
+      <header class="mobile-header">
+        <a class="mobile-brand" href="/"><span class="brand-mark">T</span><strong>Timo</strong></a>
+        <span class="mobile-page-title">AI 设置</span>
+      </header>
+
+      <section class="page-wrap">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">LLM SOURCES</p>
+            <h1>AI 设置</h1>
+            <p class="page-summary">配置 OpenAI 兼容来源（Base URL + API Key + 模型），一键切换当前使用的 AI 服务。</p>
+          </div>
+          <button class="button primary" id="new-config" type="button"><span aria-hidden="true">＋</span> 添加来源</button>
+        </div>
+
+        <div id="config-source" class="source-banner"></div>
+
+        <div id="config-list" class="project-grid" aria-live="polite">
+          <div class="project-skeleton"></div>
+        </div>
+
+        <div class="settings-help">
+          <h3>使用说明</h3>
+          <ul>
+            <li>所有来源都用 <strong>OpenAI 兼容格式</strong>：填写服务的 Base URL、API Key 和模型名。</li>
+            <li>DeepSeek：<code>https://api.deepseek.com</code>、模型如 <code>deepseek-chat</code>。</li>
+            <li>智谱 GLM：<code>https://open.bigmodel.cn/api/paas/v4</code>。</li>
+            <li>OpenAI：<code>https://api.openai.com/v1</code>。</li>
+            <li>本地 Ollama：<code>http://localhost:11434/v1</code>，API Key 可留空。</li>
+            <li>未激活任何来源时，会使用 <code>.env</code> 文件里的 <code>LLM_API_KEY</code> / <code>LLM_BASE_URL</code> / <code>LLM_MODEL</code>。</li>
+            <li>切换后立即生效，题库、复习、项目追问都会用当前来源。</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="config-dialog" class="modal compact-modal">
+    <form id="config-form" class="modal-form">
+      <div class="modal-header">
+        <div><p class="eyebrow">LLM SOURCE</p><h2 id="config-dialog-title">添加来源</h2></div>
+        <button class="icon-button close-config-dialog" type="button" aria-label="关闭" title="关闭">×</button>
+      </div>
+      <input id="config-id" type="hidden">
+      <label class="field"><span>名称</span><input id="config-name" type="text" maxlength="60" placeholder="如 DeepSeek、智谱 GLM、本地 Ollama" required></label>
+      <label class="field"><span>Base URL</span><input id="config-base-url" type="text" maxlength="300" placeholder="https://api.deepseek.com"></label>
+      <label class="field"><span>API Key</span><input id="config-api-key" type="password" autocomplete="off" maxlength="500" placeholder="编辑时留空则保留原 Key"></label>
+      <label class="field"><span>模型</span><input id="config-model" type="text" maxlength="120" placeholder="如 deepseek-chat、gpt-4o"></label>
+      <div class="form-grid two-columns">
+        <label class="field"><span>超时（秒）</span><input id="config-timeout" type="number" min="1" max="300" value="60"></label>
+        <label class="field checkbox-field"><input id="config-active" type="checkbox"><span>保存后设为当前使用</span></label>
+      </div>
+      <div class="modal-actions"><button class="button ghost close-config-dialog" type="button">取消</button><button class="button primary" id="save-config" type="submit">保存</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast-region" class="toast-region" aria-live="polite"></div>
+  <script src="/vendor/markdown-it.min.js" defer></script>
+  <script src="/markdown.js" defer></script>
+  <script src="/app.js" defer></script>
+</body>
+</html>

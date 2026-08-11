@@ -107,6 +107,24 @@ class ImportFollowupsRequest(BaseModel):
     suspended: bool = False
 
 
+class LLMConfigCreate(BaseModel):
+    name: str
+    base_url: str = ""
+    api_key: str = ""
+    model: str = ""
+    timeout: int = Field(default=60, ge=1, le=300)
+    active: bool = False
+
+
+class LLMConfigUpdate(BaseModel):
+    name: Optional[str] = None
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+    timeout: Optional[int] = Field(default=None, ge=1, le=300)
+    active: Optional[bool] = None
+
+
 class StatsOut(BaseModel):
     today_due: int
     total_questions: int
@@ -124,6 +142,8 @@ __all__ = [
     "GenerateFollowupsRequest",
     "GenerateKeypointsRequest",
     "ImportFollowupsRequest",
+    "LLMConfigCreate",
+    "LLMConfigUpdate",
     "ProjectCreate",
     "ProjectOut",
     "ProjectUpdate",

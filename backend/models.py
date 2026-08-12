@@ -84,6 +84,8 @@ class EvaluateAnswerRequest(BaseModel):
 class GenerateAnswerRequest(BaseModel):
     question: str
     keypoints: list[str] = Field(default_factory=list)
+    category: str = ""
+    topic: str = ""
 
 
 class GenerateKeypointsRequest(BaseModel):

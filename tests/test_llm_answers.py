@@ -38,6 +38,34 @@ def test_generate_reference_answer_returns_string(monkeypatch):
     assert llm.generate_reference_answer("问题", ["要点"]) == "完整参考答案"
 
 
+def test_generate_reference_answer_includes_category_and_topic(monkeypatch):
+    captured = {}
+
+    def fake_chat(system, _user):
+        captured["system"] = system
+        return {"answer": "参考答案"}
+
+    monkeypatch.setattr(llm, "_chat_json", fake_chat)
+    llm.generate_reference_answer("问题", ["要点"], category="八股", topic="JVM")
+    assert "八股" in captured["system"]
+    assert "JVM" in captured["system"]
+    # 分类会调整风格：八股 → 直击考点
+    assert "直击考点" in captured["system"]
+
+
+def test_generate_reference_answer_style_follows_category(monkeypatch):
+    captured = {}
+
+    def fake_chat(system, _user):
+        captured["system"] = system
+        return {"answer": "参考答案"}
+
+    monkeypatch.setattr(llm, "_chat_json", fake_chat)
+    llm.generate_reference_answer("问题", ["要点"], category="项目", topic="订单")
+    assert "项目" in captured["system"]
+    assert "项目背景" in captured["system"]
+
+
 def test_generate_reference_answer_rejects_empty(monkeypatch):
     monkeypatch.setattr(llm, "_chat_json", lambda _system, _user: {})
     with pytest.raises(LLMError):

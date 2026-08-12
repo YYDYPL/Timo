@@ -58,3 +58,26 @@ def test_non_json_plain_text_raises():
 
 def test_array_at_top_level():
     assert _extract_json('[{"question": "q1"}]') == [{"question": "q1"}]
+
+
+def test_fenced_json_containing_nested_code_fence():
+    # 模型把 JSON 包进 ```json 围栏，而答案内容里又有一层代码围栏：
+    # 旧的「围栏正则」会误把答案里的 ``` 当成 JSON 围栏结束而截断。
+    text = '```json\n{"answer": "```java\\npublic class X {}\\n```"}\n```'
+    parsed = _extract_json(text)
+    assert parsed["answer"] == "```java\npublic class X {}\n```"
+
+
+def test_wrapped_json_with_unbalanced_brace_inside_string():
+    # 字符串值里含未配平的 }，旧的括号配平会误判为 JSON 结束。
+    text = '好的：{"answer": "这里有 } 半个括号", "ok": true}，完毕'
+    parsed = _extract_json(text)
+    assert parsed["answer"] == "这里有 } 半个括号"
+    assert parsed["ok"] is True
+
+
+def test_prose_with_curly_braces_in_code_example():
+    # 参考答案里出现 { ... } 代码示例、外层还被说明文字包裹。
+    text = '回答如下：{"answer": "HashMap 的 put: key.hashCode() & (n-1)，树化时 {left, right}", "k": 1} 仅供参考'
+    parsed = _extract_json(text)
+    assert parsed["k"] == 1

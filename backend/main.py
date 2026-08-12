@@ -606,7 +606,12 @@ def ai_generate_answer(payload: GenerateAnswerRequest) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail="请先填写题目内容")
     keypoints = _clean_list(payload.keypoints)
     try:
-        answer = generate_reference_answer(question, keypoints)
+        answer = generate_reference_answer(
+            question,
+            keypoints,
+            category=(payload.category or "").strip(),
+            topic=(payload.topic or "").strip(),
+        )
     except LLMError as exc:
         raise _llm_http_error(exc) from exc
     return {"answer": answer}

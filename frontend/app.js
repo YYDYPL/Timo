@@ -267,6 +267,13 @@
         + '<option value="__custom__">＋ 自定义…</option>';
     }
 
+    function getFormTopic() {
+      const select = $("#question-topic");
+      if (!select) return "";
+      if (select.value === "__custom__") return $("#custom-topic-input").value.trim();
+      return select.value.trim();
+    }
+
     function refreshTopicOptions() {
       const selected = topicFilter.value;
       const category = categoryFilter.value;
@@ -406,7 +413,12 @@
       try {
         const result = await api("/api/ai/generate-answer", {
           method: "POST",
-          body: { question: questionText, keypoints },
+          body: {
+            question: questionText,
+            keypoints,
+            category: $("#question-category").value,
+            topic: getFormTopic(),
+          },
         });
         $("#question-answer").value = result.answer || "";
         toast("参考答案已生成", "已填入参考答案文本框，可继续编辑。");
@@ -503,9 +515,7 @@
       event.preventDefault();
       const id = $("#question-id").value;
       const saveButton = $("#save-question");
-      const topicSelect = $("#question-topic");
-      const isCustomTopic = topicSelect.value === "__custom__";
-      const topic = isCustomTopic ? $("#custom-topic-input").value.trim() : topicSelect.value.trim();
+      const topic = getFormTopic();
       if (!topic) {
         toast("请选择或填写主题", "主题不能为空。", "error");
         return;

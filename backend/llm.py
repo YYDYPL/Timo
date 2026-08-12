@@ -81,42 +81,50 @@ def _extract_json(content: str) -> Any:
     if not text:
         raise LLMError("LLM 返回了空内容")
 
-    fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", text, flags=re.DOTALL | re.IGNORECASE)
-    if fenced:
-        text = fenced.group(1).strip()
-
+    # 整段就是合法 JSON 时直接返回（最干净的情况）。
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        # Some compatible providers still wrap the object in prose. Extract
-        # every JSON string literal so reply text (Chinese quotes, parentheses,
-        # etc.) can no longer be mistaken for the container token.
-        literal_re = re.compile(r'"((?:[^"\\]|\\.)*)"')
-        literal_spans = [it.span() for it in literal_re.finditer(text)]
-        for token in ("{", "["):
-            closer = "}" if token == "{" else "]"
-            for opener in re.finditer(re.escape(token), text):
-                start = opener.start()
-                if any(a < start < b for a, b in literal_spans):
-                    continue
-                # naive bracket balance until the matching closer
-                balance = 0
-                end = None
-                for i in range(start, len(text)):
-                    if text[i] == token:
-                        balance += 1
-                    elif text[i] == closer:
-                        balance -= 1
-                        if balance == 0:
-                            end = i + 1
-                            break
-                if end is None:
-                    continue
-                try:
-                    return json.loads(text[start:end])
-                except json.JSONDecodeError:
-                    pass
-        raise LLMError("LLM 未返回有效 JSON")
+        pass
+
+    # 否则逐字符扫描：在字符串字面量之外（含转义）找到第一个配平的
+    # {...} 或 [...]，再尝试解析。这样能正确处理：
+    # - 前后有说明文字 / 中文括号引号；
+    # - 答案内容里嵌套的 Markdown 代码围栏或 { }、[ ] 字符；
+    # - 旧的「围栏正则」会误把答案里的 ``` 当成 JSON 围栏的结束而截断。
+    for start in range(len(text)):
+        opener = text[start]
+        if opener not in "{[":
+            continue
+        closer = "}" if opener == "{" else "]"
+        depth = 0
+        in_string = False
+        escaped = False
+        i = start
+        while i < len(text):
+            char = text[i]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    in_string = False
+            else:
+                if char == '"':
+                    in_string = True
+                elif char == opener:
+                    depth += 1
+                elif char == closer:
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            return json.loads(text[start : i + 1])
+                        except json.JSONDecodeError:
+                            break  # 该起点不是有效 JSON，换下一个起点
+            i += 1
+
+    raise LLMError("LLM 未返回有效 JSON")
 
 
 def _chat_json(system_prompt: str, user_prompt: str) -> Any:
@@ -209,13 +217,30 @@ def generate_followup_questions(project: dict[str, Any], count: int = 6) -> list
     return result
 
 
-def generate_reference_answer(question: str, keypoints: list[str]) -> str:
-    """Draft a concise reference answer from a question and its keypoints."""
+def generate_reference_answer(
+    question: str,
+    keypoints: list[str],
+    category: str = "",
+    topic: str = "",
+) -> str:
+    """Draft a concise reference answer from a question, its keypoints, and the
+    question's category/topic (used to tune the answer style)."""
+
+    category = (category or "").strip()
+    topic = (topic or "").strip()
+
+    style = {
+        "八股": "直击考点、表述标准严谨，优先使用公认的定义与结论",
+        "agent": "结合 Agent 工程实践来讲（工具调用、上下文管理、评估、多智能体等）",
+        "项目": "结合项目背景讲清做法、难点、取舍与结果",
+    }.get(category.lower(), "条理清晰地讲清核心概念、原理与要点")
 
     system_prompt = (
-        "你是资深技术面试官。根据题目和给出的要点，撰写一段简明完整、条理清晰的中文参考答案"
-        "（200-500 字），覆盖全部要点。参考答案正文可适当使用 Markdown 排版"
-        "（加粗、列表、行内代码、代码块）。只输出 JSON 对象，不要输出 JSON 之外的 Markdown。"
+        f"你是资深技术面试官，为一道「{category or '未分类'}」分类、"
+        f"「{topic or '未指定'}」主题的面试题撰写参考答案。"
+        f"要求：{style}；简明完整（200-500 字），覆盖给出的全部要点；"
+        "参考答案正文可适当使用 Markdown 排版（加粗、列表、行内代码、代码块）。"
+        "只输出 JSON 对象，不要输出 JSON 之外的 Markdown。"
     )
     user_prompt = f"""
 面试题：{question}

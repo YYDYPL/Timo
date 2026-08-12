@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -58,6 +59,63 @@ def is_configured() -> bool:
     settings = get_settings()
     # Local OpenAI-compatible servers commonly do not require a real key.
     return bool(settings["model"] and (settings["api_key"] or settings["base_url"]))
+
+
+def test_llm_connection(
+    *,
+    base_url: str = "",
+    api_key: str = "",
+    model: str = "",
+    timeout: int = 60,
+) -> dict[str, Any]:
+    """Verify a candidate LLM source (not yet saved) with a minimal chat call.
+
+    Returns ``{"ok": bool, "message": str}`` — it never raises, so the settings
+    page can show the result inline. Only the values passed in are used; the
+    active configuration is not touched.
+    """
+
+    base_url = (base_url or "").strip()
+    api_key = (api_key or "").strip()
+    model = (model or "").strip()
+    timeout = max(1, min(int(timeout or 60), 30))
+
+    if not model:
+        return {"ok": False, "message": "请先填写模型名称"}
+    if not base_url and not api_key:
+        return {"ok": False, "message": "请至少填写 Base URL 或 API Key 之一"}
+
+    try:
+        from openai import OpenAI
+    except ImportError as exc:
+        return {"ok": False, "message": "openai 依赖未安装，请先运行 pip install -r requirements.txt"}
+
+    client = OpenAI(api_key=api_key or "not-needed", base_url=base_url or None, timeout=timeout, max_retries=0)
+    started = time.monotonic()
+    try:
+        client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "ping"}],
+            max_tokens=1,
+            temperature=0,
+        )
+    except Exception as exc:
+        status = getattr(exc, "status_code", None)
+        class_name = exc.__class__.__name__.lower()
+        if status == 401:
+            return {"ok": False, "message": "API Key 无效或已过期"}
+        if status == 404:
+            return {"ok": False, "message": "模型不存在，或 Base URL 路径不对（通常以 /v1 结尾）"}
+        if status:
+            return {"ok": False, "message": f"请求失败（HTTP {status}）：{str(exc)[:200]}"}
+        if "timeout" in class_name:
+            return {"ok": False, "message": "请求超时，请检查 Base URL 或网络"}
+        if "connection" in class_name:
+            return {"ok": False, "message": "无法连接，请检查 Base URL 或网络"}
+        return {"ok": False, "message": f"连接失败：{str(exc)[:200]}"}
+
+    latency_ms = int((time.monotonic() - started) * 1000)
+    return {"ok": True, "message": f"连接成功，模型 {model} 可用（{latency_ms}ms）", "model": model, "latency_ms": latency_ms}
 
 
 @lru_cache(maxsize=8)
@@ -356,4 +414,5 @@ __all__ = [
     "generate_reference_answer",
     "get_settings",
     "is_configured",
+    "test_llm_connection",
 ]

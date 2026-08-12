@@ -43,6 +43,7 @@ try:
         generate_keypoints,
         generate_reference_answer,
         is_configured,
+        test_llm_connection,
     )
     from .models import (
         EvaluateAnswerRequest,
@@ -53,6 +54,7 @@ try:
         ImportFollowupsRequest,
         LLMConfigCreate,
         LLMConfigUpdate,
+        LLMTestRequest,
         ProjectCreate,
         ProjectUpdate,
         QuestionCreate,
@@ -92,6 +94,7 @@ except ImportError:  # Allows: uvicorn main:app from inside backend/
         generate_keypoints,
         generate_reference_answer,
         is_configured,
+        test_llm_connection,
     )
     from models import (  # type: ignore
         EvaluateAnswerRequest,
@@ -102,6 +105,7 @@ except ImportError:  # Allows: uvicorn main:app from inside backend/
         ImportFollowupsRequest,
         LLMConfigCreate,
         LLMConfigUpdate,
+        LLMTestRequest,
         ProjectCreate,
         ProjectUpdate,
         QuestionCreate,
@@ -729,6 +733,24 @@ def activate_llm_config_endpoint(config_id: int) -> dict[str, Any]:
 def activate_env_config_endpoint() -> dict[str, Any]:
     deactivate_all_llm_configs()
     return {"active_id": None, "source": "env", "is_configured": is_configured()}
+
+
+@app.post("/api/llm/test")
+def test_llm_config_endpoint(payload: LLMTestRequest) -> dict[str, Any]:
+    base_url = (payload.base_url or "").strip()
+    api_key = (payload.api_key or "").strip()
+    model = (payload.model or "").strip()
+    timeout = payload.timeout or 60
+    # 编辑既有来源时 Key 留空 = 用已保存的 Key 来测。
+    if payload.config_id is not None and not api_key:
+        saved = get_llm_config(payload.config_id)
+        if saved:
+            api_key = (saved.get("api_key") or "").strip()
+            if not base_url:
+                base_url = (saved.get("base_url") or "").strip()
+            if not model:
+                model = (saved.get("model") or "").strip()
+    return test_llm_connection(base_url=base_url, api_key=api_key, model=model, timeout=timeout)
 
 
 @app.delete("/api/llm/configs/{config_id}", status_code=status.HTTP_204_NO_CONTENT)

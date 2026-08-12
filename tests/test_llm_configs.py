@@ -6,7 +6,9 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
+import openai
 import pytest
 
 from backend import db as backend_db
@@ -129,3 +131,90 @@ def test_requires_name(client):
 def test_update_missing_config_returns_404(client):
     resp = client.put("/api/llm/configs/999", json={"name": "X"})
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# 测试连接
+
+
+def _fake_openai(create_impl, init_capture=None):
+    """构建一个可注入 create 行为的假 OpenAI 客户端，并替换 openai.OpenAI。"""
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return create_impl(kwargs)
+
+    class FakeChat:
+        def __init__(self):
+            self.completions = FakeCompletions()
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            if init_capture is not None:
+                init_capture.update(kwargs)
+            self.chat = FakeChat()
+
+    return FakeClient
+
+
+def test_test_endpoint_missing_model(client):
+    resp = client.post("/api/llm/test", json={"base_url": "https://x", "api_key": "k", "model": "   "})
+    data = resp.json()
+    assert resp.status_code == 200
+    assert data["ok"] is False
+    assert "模型" in data["message"]
+
+
+def test_test_endpoint_success(client, monkeypatch):
+    def ok_create(_kwargs):
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="pong"))])
+
+    monkeypatch.setattr(openai, "OpenAI", _fake_openai(ok_create))
+    resp = client.post("/api/llm/test", json={"base_url": "https://api.deepseek.com", "api_key": "sk-x", "model": "deepseek-chat"})
+    data = resp.json()
+    assert resp.status_code == 200
+    assert data["ok"] is True
+    assert "deepseek-chat" in data["message"]
+
+
+def test_test_endpoint_invalid_key(client, monkeypatch):
+    class Boom(Exception):
+        status_code = 401
+
+    def fail_create(_kwargs):
+        raise Boom("bad key")
+
+    monkeypatch.setattr(openai, "OpenAI", _fake_openai(fail_create))
+    resp = client.post("/api/llm/test", json={"base_url": "https://x", "api_key": "bad", "model": "m"})
+    data = resp.json()
+    assert data["ok"] is False
+    assert "API Key" in data["message"]
+
+
+def test_test_endpoint_connection_error(client, monkeypatch):
+    def fail_create(_kwargs):
+        raise ConnectionError("refused")
+
+    monkeypatch.setattr(openai, "OpenAI", _fake_openai(fail_create))
+    resp = client.post("/api/llm/test", json={"base_url": "http://127.0.0.1:1", "api_key": "k", "model": "m"})
+    data = resp.json()
+    assert data["ok"] is False
+    assert "无法连接" in data["message"]
+
+
+def test_test_endpoint_uses_saved_key_when_blank(client, monkeypatch):
+    created = client.post("/api/llm/configs", json=_payload(api_key="sk-saved-1234")).json()
+    captured = {}
+
+    def ok_create(kwargs):
+        captured["model"] = kwargs["model"]
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="pong"))])
+
+    monkeypatch.setattr(openai, "OpenAI", _fake_openai(ok_create, captured))
+    resp = client.post("/api/llm/test", json={"config_id": created["id"], "api_key": "", "base_url": "", "model": ""})
+    data = resp.json()
+    assert resp.status_code == 200
+    assert data["ok"] is True
+    # 编辑时 Key 留空，用的是已保存的 Key 与模型
+    assert captured["api_key"] == "sk-saved-1234"
+    assert captured["model"] == "deepseek-chat"

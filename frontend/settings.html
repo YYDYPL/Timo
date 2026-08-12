@@ -82,6 +82,10 @@
         <label class="field"><span>超时（秒）</span><input id="config-timeout" type="number" min="1" max="300" value="60"></label>
         <label class="field checkbox-field"><input id="config-active" type="checkbox"><span>保存后设为当前使用</span></label>
       </div>
+      <div class="test-connection">
+        <button class="button secondary small" id="test-config" type="button">测试连接</button>
+        <span id="test-config-status" class="test-status" aria-live="polite"></span>
+      </div>
       <div class="modal-actions"><button class="button ghost close-config-dialog" type="button">取消</button><button class="button primary" id="save-config" type="submit">保存</button></div>
     </form>
   </dialog>

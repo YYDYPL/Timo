@@ -482,6 +482,10 @@ input::placeholder, textarea::placeholder { color: #9aa39f; }
 .source-banner-label { font-size: 13px; color: var(--text-soft); }
 .source-banner-label strong { color: var(--text); }
 .config-card { min-height: 0; }
+.test-connection { display: flex; align-items: center; gap: 10px; margin: -6px 0 18px; }
+.test-status { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.test-status.ok { color: var(--brand); }
+.test-status.error { color: var(--danger); }
 .config-detail { display: grid; gap: 5px; margin-top: 4px; }
 .config-detail p { margin: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .settings-help { margin-top: 26px; padding: 20px 22px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }

@@ -127,6 +127,14 @@ class LLMConfigUpdate(BaseModel):
     active: Optional[bool] = None
 
 
+class LLMTestRequest(BaseModel):
+    config_id: Optional[int] = None
+    base_url: str = ""
+    api_key: str = ""
+    model: str = ""
+    timeout: int = Field(default=60, ge=1, le=300)
+
+
 class StatsOut(BaseModel):
     today_due: int
     total_questions: int
@@ -146,6 +154,7 @@ __all__ = [
     "ImportFollowupsRequest",
     "LLMConfigCreate",
     "LLMConfigUpdate",
+    "LLMTestRequest",
     "ProjectCreate",
     "ProjectOut",
     "ProjectUpdate",

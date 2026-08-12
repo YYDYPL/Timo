@@ -1066,6 +1066,8 @@
       $("#config-model").value = config?.model || "";
       $("#config-timeout").value = String(config?.timeout || 60);
       $("#config-active").checked = Boolean(config) && Number(config.id) === Number(state.activeId);
+      const status = $("#test-config-status");
+      if (status) { status.textContent = ""; status.className = "test-status"; }
       openDialog(dialog);
       window.setTimeout(() => $("#config-name").focus(), 30);
     }
@@ -1086,6 +1088,33 @@
 
     $("#new-config").addEventListener("click", () => openConfigForm());
     $$(".close-config-dialog").forEach((button) => button.addEventListener("click", () => closeDialog(dialog)));
+
+    $("#test-config").addEventListener("click", async () => {
+      const button = $("#test-config");
+      const status = $("#test-config-status");
+      status.textContent = "";
+      status.className = "test-status";
+      setButtonBusy(button, true, "测试中…");
+      try {
+        const result = await api("/api/llm/test", {
+          method: "POST",
+          body: {
+            config_id: $("#config-id").value ? Number($("#config-id").value) : null,
+            base_url: $("#config-base-url").value.trim(),
+            api_key: $("#config-api-key").value.trim(),
+            model: $("#config-model").value.trim(),
+            timeout: Number($("#config-timeout").value) || 60,
+          },
+        });
+        status.textContent = result.ok ? `✓ ${result.message}` : `✗ ${result.message}`;
+        status.className = result.ok ? "test-status ok" : "test-status error";
+      } catch (error) {
+        status.textContent = `✗ ${error.message}`;
+        status.className = "test-status error";
+      } finally {
+        setButtonBusy(button, false);
+      }
+    });
 
     list.addEventListener("click", async (event) => {
       const action = event.target.closest("button");

@@ -423,6 +423,12 @@ input::placeholder, textarea::placeholder { color: #9aa39f; }
 .markdown hr { margin: 1em 0; border: 0; border-top: 1px solid var(--line-strong); }
 .markdown a { color: var(--brand); text-decoration: underline; }
 .markdown img { max-width: 100%; }
+.markdown li.task-list-item { list-style: none; }
+.markdown li.task-list-item::before { content: none; }
+.markdown .task-list-item input[type="checkbox"] { margin-right: 8px; accent-color: var(--brand); transform: translateY(1px); }
+.markdown pre[data-mermaid-done] { padding: 10px 6px; overflow: visible; background: transparent; text-align: center; }
+.markdown pre[data-mermaid-done] svg { max-width: 100%; height: auto; }
+.mermaid-fallback { margin-bottom: 6px; color: var(--muted); font-size: 12px; }
 .keypoint-list { display: grid; gap: 9px; margin: 0; padding: 0; counter-reset: point; list-style: none; }
 .keypoint-list li { position: relative; min-height: 31px; padding: 4px 0 4px 40px; color: var(--text-soft); counter-increment: point; }
 .keypoint-list li::before { content: counter(point); position: absolute; left: 0; top: 0; display: grid; width: 29px; height: 29px; place-items: center; border-radius: 50%; background: var(--brand-soft); color: var(--brand-dark); font-size: 12px; font-weight: 800; }

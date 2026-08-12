@@ -67,6 +67,20 @@
     return escapeHtml(value);
   }
 
+  function renderMarkdownInto(el, text, inline = false) {
+    if (!el) return;
+    el.innerHTML = inline ? renderInlineMarkdown(text) : renderMarkdown(text);
+    if (window.MarkdownRenderer && typeof window.MarkdownRenderer.enhance === "function") {
+      window.MarkdownRenderer.enhance(el);
+    }
+  }
+
+  function enhanceMarkdown(root) {
+    if (window.MarkdownRenderer && typeof window.MarkdownRenderer.enhanceAll === "function") {
+      window.MarkdownRenderer.enhanceAll(root);
+    }
+  }
+
   function asList(payload, keys = ["items"]) {
     if (Array.isArray(payload)) return payload;
     for (const key of keys) {
@@ -191,10 +205,18 @@
     }
   }
 
+  function initRichPaste() {
+    if (!window.RichPaste) return;
+    ["#question-text", "#question-answer", "#question-keypoints", "#project-description"].forEach((selector) => {
+      window.RichPaste.attach($(selector));
+    });
+  }
+
   function initCommon() {
     $(`[data-nav="${page}"]`)?.classList.add("active");
     loadNavSnapshot();
     updateAiStatus();
+    initRichPaste();
   }
 
   // -----------------------------------------------------------------------
@@ -318,6 +340,7 @@
             </div>
           </article>`;
       }).join("");
+      enhanceMarkdown(list);
     }
 
     function openQuestionForm(question = null) {
@@ -569,12 +592,13 @@
       category.className = `category-badge ${categoryClass(question.category)}`;
       $("#review-topic").textContent = question.topic || "未分类";
       $("#review-position").textContent = `${state.queue.length + 1} 张待处理`;
-      $("#review-question").innerHTML = renderInlineMarkdown(question.question);
+      renderMarkdownInto($("#review-question"), question.question, true);
       $("#review-answer").innerHTML = renderMarkdown(question.answer) || '<p class="muted">暂无参考答案，请以关键要点为准。</p>';
       const keypoints = normalizeStringList(question.keypoints);
       $("#review-keypoints").innerHTML = keypoints.length
         ? keypoints.map((point) => `<li class="markdown">${renderMarkdown(point)}</li>`).join("")
         : "<li>暂无关键要点</li>";
+      enhanceMarkdown($("#review-card"));
       $("#evaluate-answer").disabled = !state.aiConfigured;
       $("#evaluate-answer").title = state.aiConfigured ? "" : "请先在 .env 中配置 LLM";
       card.hidden = false;
@@ -783,6 +807,7 @@
             </span>
           </label>`;
       }).join("");
+      enhanceMarkdown($("#followup-list"));
       refreshFollowupSelection();
     }
 
